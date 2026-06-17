@@ -1,0 +1,20 @@
+{
+  "name": "dailyview-scraper",
+  "version": "1.0.0",
+  "description": "抓取 dailyview.tw 周榜数据并导出Excel",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "cheerio": "^1.0.0",
+    "exceljs": "^4.4.0",
+    "https-proxy-agent": "^7.0.0",
+    "socks-proxy-agent": "^8.0.0"
+  },
+  "devDependencies": {
+    "nexe": "^5.0.0-beta.4",
+    "pkg": "^5.8.1"
+  }
+}

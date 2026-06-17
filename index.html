@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MFData - 数据抓取工具</title>
+  <style>
+    :root {
+      --bg: #f0f2f5;
+      --surface: #ffffff;
+      --primary: #4472C4;
+      --primary-hover: #3659a0;
+      --text: #333333;
+      --text-secondary: #666666;
+      --border: #d9d9d9;
+      --success: #52c41a;
+      --error: #ff4d4f;
+      --warning: #faad14;
+      --radius: 8px;
+      --shadow: 0 2px 8px rgba(0,0,0,0.08);
+      --sidebar-w: 200px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 标题栏 */
+    .titlebar {
+      background: var(--primary);
+      color: #fff;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      flex-shrink: 0;
+    }
+    .titlebar .logo { font-size: 22px; }
+    .titlebar h1 { font-size: 17px; font-weight: 600; letter-spacing: 1px; }
+    .titlebar .badge { 
+      background: rgba(255,255,255,0.2); 
+      padding: 2px 10px; 
+      border-radius: 12px; 
+      font-size: 12px; 
+      margin-left: auto;
+    }
+
+    /* 主体布局 */
+    .main-layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* 侧边导航 */
+    .sidebar {
+      width: var(--sidebar-w);
+      background: #fff;
+      border-right: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      padding-top: 8px;
+    }
+    .nav-section {
+      padding: 8px 16px 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-secondary);
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+      text-decoration: none;
+    }
+    .nav-item:hover { background: #f5f8ff; color: var(--primary); }
+    .nav-item.active { 
+      background: #eef3ff; 
+      color: var(--primary); 
+      font-weight: 600;
+      border-left-color: var(--primary);
+    }
+    .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+    .sidebar-spacer { flex: 1; }
+    .sidebar-footer {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: #ccc;
+    }
+
+    /* 内容区 */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+    }
+    .page {
+      display: none;
+    }
+    .page.active {
+      display: block;
+    }
+
+    /* 卡片 */
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title .icon { font-size: 18px; }
+
+    /* 表单行 */
+    .form-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 160px;
+    }
+    .form-group label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+    .form-group input,
+    .form-group select {
+      height: 36px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(68,114,196,0.15);
+    }
+    .form-group input.wide { min-width: 340px; }
+    .form-group textarea {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+      outline: none;
+      resize: vertical;
+      min-height: 60px;
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 13px;
+    }
+    .form-group textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(68,114,196,0.15);
+    }
+
+    /* 按钮 */
+    .btn {
+      height: 36px;
+      padding: 0 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover { background: #45a71a; }
+    .btn-outline { background: #fff; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-sm { height: 30px; padding: 0 12px; font-size: 13px; }
+
+    /* 状态栏 */
+    .status-bar {
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-top: 12px;
+      display: none;
+    }
+    .status-bar.info { display: block; background: #e6f0ff; color: #1e5db5; border: 1px solid #b8d4ff; }
+    .status-bar.success { display: block; background: #f0fff4; color: #1a7a3a; border: 1px solid #b7ebbe; }
+    .status-bar.error { display: block; background: #fff1f0; color: #a0141f; border: 1px solid #ffccc7; }
+    .status-bar .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* 表格 */
+    .table-wrapper {
+      max-height: 520px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+    thead { position: sticky; top: 0; z-index: 2; }
+    th {
+      background: var(--primary);
+      color: #fff;
+      padding: 9px 12px;
+      font-weight: 500;
+      text-align: center;
+    }
+    th:first-child { width: 60px; }
+    th:nth-child(2) { text-align: left; }
+    th:last-child { text-align: left; }
+    td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }
+    td:first-child { text-align: center; }
+    td:nth-child(2) { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    td:nth-child(7) { text-align: left; font-size: 12px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    tr:hover td { background: #f5f8ff; }
+    .rank-badge {
+      display: inline-block;
+      width: 28px; height: 28px;
+      line-height: 28px;
+      border-radius: 50%;
+      text-align: center;
+      font-weight: 700;
+      font-size: 13px;
+      color: #fff;
+      background: #999;
+    }
+    .rank-1 { background: #e74c3c; }
+    .rank-2 { background: #e67e22; }
+    .rank-3 { background: #f39c12; }
+    .rank-4-10 { background: #4472C4; }
+
+    /* 空状态 / 占位 */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #aaa;
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 14px; }
+
+    /* 数据概览 */
+    .data-summary {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .summary-item {
+      background: #f5f8ff;
+      border-radius: 6px;
+      padding: 10px 16px;
+      text-align: center;
+      min-width: 80px;
+    }
+    .summary-item .num { font-size: 22px; font-weight: 700; color: var(--primary); }
+    .summary-item .label { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+    /* 提示 */
+    .hint {
+      font-size: 12px;
+      color: #999;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+    .hint code { 
+      background: #f0f0f0; 
+      padding: 1px 6px; 
+      border-radius: 3px; 
+      font-size: 11px; 
+    }
+
+    /* 分隔线 */
+    .sep { margin: 16px 0; border: none; border-top: 1px solid var(--border); }
+
+    /* 通用代理指示器 */
+    .proxy-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      margin-left: auto;
+    }
+    .proxy-indicator.on {
+      background: #f0fff4;
+      color: #1a7a3a;
+    }
+    .proxy-indicator.off {
+      background: #fff1f0;
+      color: #a0141f;
+    }
+
+    /* 设置页面 */
+    .setting-section {
+      margin-bottom: 24px;
+    }
+    .setting-section h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+    .setting-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .setting-row label {
+      width: 100px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+    .setting-row input,
+    .setting-row select {
+      flex: 1;
+      max-width: 500px;
+      height: 36px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+      outline: none;
+    }
+    .setting-row input:focus,
+    .setting-row select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(68,114,196,0.15);
+    }
+    .test-result {
+      display: inline-block;
+      margin-left: 10px;
+      font-size: 13px;
+    }
+    .test-result.ok { color: var(--success); }
+    .test-result.fail { color: var(--error); }
+    .test-result.testing { color: var(--warning); }
+
+    /* 响应式 */
+    @media (max-width: 700px) {
+      .sidebar { width: 160px; }
+      .form-row { flex-direction: column; }
+      .form-group input.wide { min-width: unset; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="titlebar">
+    <span class="logo">📊</span>
+    <h1>MFData - 数据抓取工具</h1>
+    <span id="proxyIndicator" class="proxy-indicator off">⚫ 未配置代理</span>
+    <span class="badge">v1.0</span>
+  </div>
+
+  <div class="main-layout">
+    <!-- 侧边导航 -->
+    <nav class="sidebar">
+      <div class="nav-section">数据源</div>
+      <div class="nav-item active" data-page="page-dailyview">
+        <span class="icon">📈</span>DailyView 周榜
+      </div>
+      <!-- 未来可在此添加更多网站 -->
+      <div class="nav-section">系统</div>
+      <div class="nav-item" data-page="page-settings">
+        <span class="icon">⚙️</span>全局设置
+      </div>
+      <div class="nav-item" data-page="page-history">
+        <span class="icon">📋</span>抓取记录
+      </div>
+      <div class="sidebar-spacer"></div>
+      <div class="sidebar-footer" id="sidebarVersion" style="cursor:pointer;" onclick="checkUpdate()" title="点击检查更新">
+        MFData v<span id="versionNum">1.0.0</span>
+      </div>
+    </nav>
+
+    <!-- 内容区 -->
+    <div class="content">
+
+      <!-- ==================== DailyView 页面 ==================== -->
+      <div class="page active" id="page-dailyview">
+        <!-- 抓取设置 -->
+        <div class="card">
+          <div class="card-title"><span class="icon">⚙️</span> 抓取设置</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>话题分类</label>
+              <select id="topicId" style="min-width:220px;">
+                <option value="">加载中...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>时间范围</label>
+              <select id="range">
+                <option value="1">今日</option>
+                <option value="7" selected>本周</option>
+                <option value="30">本月</option>
+              </select>
+            </div>
+          </div>
+          <div class="hint" style="margin-top:8px;">
+            💡 代理配置在「全局设置」页面统一管理，所有数据源共享同一代理。
+          </div>
+          <div class="form-row" style="margin-top:14px;">
+            <button class="btn btn-primary" id="btnFetch" onclick="startFetch()">🔍 抓取数据</button>
+            <button class="btn btn-outline btn-sm" onclick="clearAll()">🗑 清除数据</button>
+          </div>
+          <div id="statusBar" class="status-bar"></div>
+        </div>
+
+        <!-- 数据展示 -->
+        <div class="card" id="dataCard" style="display:none;">
+          <div class="card-title"><span class="icon">📋</span> 抓取结果</div>
+          <div class="data-summary" id="dataSummary"></div>
+          <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center;">
+            <button class="btn btn-success" id="btnExport" onclick="exportData()">📥 导出 Excel</button>
+            <button class="btn btn-outline btn-sm" onclick="previewPrint()">🖨 打印预览</button>
+            <div style="margin-left:auto; display:flex; gap:6px; align-items:center;" id="pagination"></div>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th rowspan="2" style="vertical-align:middle;">排名</th><th rowspan="2" style="vertical-align:middle;">名称</th><th rowspan="2" style="vertical-align:middle;">网路口碑</th><th colspan="3">情绪分布</th><th rowspan="2" style="vertical-align:middle;">热门关键字</th></tr>
+                <tr><th style="font-size:12px;text-align:center;">正面</th><th style="font-size:12px;text-align:center;">中立</th><th style="font-size:12px;text-align:center;">负面</th></tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" id="emptyCard">
+          <div class="empty-state">
+            <div class="icon">📡</div>
+            <p>点击「抓取数据」按钮开始获取 DailyView 周榜</p>
+            <p style="font-size:12px; color:#ccc; margin-top:6px;">请先在「全局设置」中配置代理地址</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 抓取记录页面 ==================== -->
+      <div class="page" id="page-history">
+        <div class="card">
+          <div class="card-title"><span class="icon">📋</span> 抓取记录</div>
+          <div class="table-wrapper" style="max-height:500px;">
+            <table style="table-layout:auto;">
+              <thead>
+                <tr><th style="width:60px;">类型</th><th style="width:100px;">时间</th><th style="width:90px;">数据源</th><th style="width:60px;">话题</th><th style="width:70px;">条数</th><th style="width:60px;">状态</th><th style="width:110px;">操作</th></tr>
+              </thead>
+              <tbody id="historyBody"><tr><td colspan="7" style="text-align:center;padding:30px;color:#aaa;">加载中...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 全局设置页面 ==================== -->
+      <div class="page" id="page-settings">
+        <div class="card">
+          <div class="card-title"><span class="icon">🌐</span> 代理设置</div>
+          <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">
+            为目标网站配置统一的代理地址。所有数据源（DailyView 等）均共享此代理设置。
+          </p>
+
+          <div class="setting-section">
+            <h3>代理配置</h3>
+            <div class="setting-row">
+              <label>代理地址</label>
+              <input type="text" id="settingsProxyUrl" placeholder="例如：http://127.0.0.1:7890">
+            </div>
+            <div class="setting-row">
+              <label>代理类型</label>
+              <select id="settingsProxyType">
+                <option value="http">HTTP 代理</option>
+                <option value="socks5">SOCKS5 代理</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <label></label>
+              <div>
+                <button class="btn btn-primary" onclick="saveAndApplyProxy()">💾 保存并应用</button>
+                <button class="btn btn-outline btn-sm" onclick="testProxy()" style="margin-left:8px;">🔗 测试连接</button>
+                <button class="btn btn-outline btn-sm" onclick="autoDetectProxy()" style="margin-left:8px;">🔎 自动检测</button>
+                <span id="testResult" class="test-result"></span>
+              </div>
+            </div>
+            <div class="hint" style="line-height:1.8;">
+              <strong>📖 Windows 查看代理端口的方法：</strong><br>
+              1. 打开代理软件（Clash / V2RayN / Shadowsocks 等）主界面<br>
+              2. 查看软件界面显示的 HTTP/SOCKS5 端口号<br>
+              3. 或打开 <code>Windows 设置 → 网络和 Internet → 代理</code> 查看地址和端口<br>
+              4. 常见默认端口：<br>
+              &nbsp;&nbsp;&nbsp;Clash <code>http://127.0.0.1:7890</code> &nbsp;|&nbsp;
+              V2Ray <code>socks5://127.0.0.1:10808</code><br>
+              &nbsp;&nbsp;&nbsp;Shadowsocks <code>socks5://127.0.0.1:1080</code> &nbsp;|&nbsp;
+              Clash Verge <code>http://127.0.0.1:7897</code>
+            </div>
+          </div>
+
+          <hr class="sep">
+
+          <div class="setting-section">
+            <h3>连接测试记录</h3>
+            <div id="connectionLog" style="font-size:13px; color:var(--text-secondary); min-height:40px; padding:10px; background:#fafafa; border-radius:6px; line-height:1.6;">
+              暂无测试记录，点击「测试连接」开始检测
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title"><span class="icon">📋</span> 已配置的数据源</div>
+          <div style="font-size:13px; color:var(--text-secondary);">
+            <table style="width:auto; min-width:400px;">
+              <thead><tr><th style="width:40px;"></th><th>名称</th><th>说明</th><th style="width:100px;">状态</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>📈</td>
+                  <td>DailyView 周榜</td>
+                  <td>抓取 dailyview.tw Top100 话题周榜数据</td>
+                  <td style="text-align:center; color:var(--success);">✅ 已启用</td>
+                </tr>
+                <!-- 未来可在此列出更多数据源 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ========== 全局状态 ==========
+    let globalProxy = { url: '', type: 'http' };
+    let fetchedData = [];
+    let topicList = [];
+    let lastExportFile = '';
+
+    // ========== 导航 ==========
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', () => {
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        item.classList.add('active');
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        const pageId = item.getAttribute('data-page');
+        document.getElementById(pageId).classList.add('active');
+        if (pageId === 'page-settings') refreshSettingsPage();
+        if (pageId === 'page-history') loadHistoryPage();
+      });
+    });
+
+    // ========== 历史记录页面 ==========
+    async function loadHistoryPage() {
+      try {
+        const res = await fetch('/api/history');
+        const history = await res.json();
+        const tbody = document.getElementById('historyBody');
+        if (history.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#aaa;">暂无记录</td></tr>';
+          return;
+        }
+        const rangeMap = { '1': '今日', '7': '本周', '30': '本月' };
+        tbody.innerHTML = history.map(r => {
+          const time = new Date(r.time);
+          const ts = `${time.getMonth()+1}/${time.getDate()} ${String(time.getHours()).padStart(2,'0')}:${String(time.getMinutes()).padStart(2,'0')}`;
+          const typeLabel = r.type === 'fetch' ? '🔍 抓取' : r.type === 'export' ? '📥 导出' : r.type;
+          const statusColor = r.status === 'success' ? 'color:var(--success);' : 'color:var(--error);';
+          const rangeLabel = rangeMap[r.range] || r.range || '-';
+          const ops = [];
+          if (r.type === 'export' && r.filename) {
+            ops.push(`<a href="/api/download?file=${encodeURIComponent(r.filename)}" style="font-size:12px;color:var(--primary);text-decoration:none;">⬇下载</a>`);
+          }
+          return `<tr>
+            <td style="text-align:center;">${typeLabel}</td>
+            <td style="text-align:center;">${ts}</td>
+            <td style="text-align:center;">${r.source || '-'}</td>
+            <td style="text-align:center;">#${r.topicId || '-'} ${rangeLabel}</td>
+            <td style="text-align:center;">${r.count || 0}</td>
+            <td style="text-align:center;${statusColor}">${r.status === 'success' ? '✅' : '❌'}</td>
+            <td style="text-align:center;">${ops.join(' ')}</td>
+          </tr>`;
+        }).join('');
+      } catch (e) { /* ignore */ }
+    }
+
+    // ========== 代理管理 ==========
+    async function loadProxyConfig() {
+      try {
+        const res = await fetch('/api/config');
+        const cfg = await res.json();
+        globalProxy.url = cfg.proxy || '';
+        globalProxy.type = cfg.proxyType || 'http';
+        updateProxyIndicator();
+      } catch (e) { /* ignore */ }
+    }
+
+    async function saveProxyConfig(url, type) {
+      globalProxy.url = url;
+      globalProxy.type = type;
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proxy: url, proxyType: type }),
+      });
+      updateProxyIndicator();
+    }
+
+    function updateProxyIndicator() {
+      const el = document.getElementById('proxyIndicator');
+      if (globalProxy.url) {
+        el.className = 'proxy-indicator on';
+        el.innerHTML = '🟢 代理已配置';
+      } else {
+        el.className = 'proxy-indicator off';
+        el.innerHTML = '⚫ 未配置代理';
+      }
+    }
+
+    function getProxyUrl() { return globalProxy.url; }
+    function getProxyType() { return globalProxy.type; }
+
+    async function autoDetectProxy() {
+      const el = document.getElementById('testResult');
+      el.className = 'test-result testing';
+      el.textContent = '⏳ 正在检测系统代理...';
+      
+      try {
+        const res = await fetch('/api/detect-proxy');
+        const data = await res.json();
+        if (data.found && data.proxy) {
+          document.getElementById('settingsProxyUrl').value = data.proxy.url;
+          document.getElementById('settingsProxyType').value = data.proxy.type || 'http';
+          el.className = 'test-result ok';
+          el.textContent = `✅ 已检测到代理：${data.proxy.url}`;
+          // 自动保存
+          await saveProxyConfig(data.proxy.url, data.proxy.type || 'http');
+          refreshSettingsPage();
+        } else {
+          el.className = 'test-result fail';
+          el.textContent = '❌ 未检测到系统代理，请手动输入';
+        }
+      } catch (e) {
+        el.className = 'test-result fail';
+        el.textContent = '❌ 检测失败: ' + e.message;
+      }
+    }
+
+    // ========== 设置页面逻辑 ==========
+    function refreshSettingsPage() {
+      document.getElementById('settingsProxyUrl').value = globalProxy.url;
+      document.getElementById('settingsProxyType').value = globalProxy.type;
+      document.getElementById('testResult').textContent = '';
+    }
+
+    async function saveAndApplyProxy() {
+      const url = document.getElementById('settingsProxyUrl').value.trim();
+      const type = document.getElementById('settingsProxyType').value;
+      try {
+        await saveProxyConfig(url, type);
+        document.getElementById('testResult').className = 'test-result ok';
+        document.getElementById('testResult').textContent = '✅ 已保存';
+        setTimeout(() => { document.getElementById('testResult').textContent = ''; }, 2000);
+        refreshSettingsPage();
+      } catch (e) {
+        document.getElementById('testResult').className = 'test-result fail';
+        document.getElementById('testResult').textContent = '❌ 保存失败';
+      }
+    }
+
+    async function testProxy() {
+      const url = document.getElementById('settingsProxyUrl').value.trim();
+      const type = document.getElementById('settingsProxyType').value;
+      const el = document.getElementById('testResult');
+      const log = document.getElementById('connectionLog');
+
+      if (!url) {
+        el.className = 'test-result fail';
+        el.textContent = '❌ 请先输入代理地址';
+        return;
+      }
+
+      el.className = 'test-result testing';
+      el.textContent = '⏳ 正在测试 dailyview.tw 连通性...';
+      const now = new Date();
+      const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+
+      try {
+        const res = await fetch('/api/test-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ proxy: url, proxyType: type }),
+        });
+        const result = await res.json();
+        if (result.success) {
+          el.className = 'test-result ok';
+          el.textContent = `✅ ${result.message}`;
+          await saveProxyConfig(url, type);
+          log.innerHTML = `🟢 <strong>${ts}</strong> — 连接成功：<code>${escapeHtml(url)}</code> (${type.toUpperCase()})，延迟 ${result.elapsed}<br>` + log.innerHTML;
+        } else {
+          el.className = 'test-result fail';
+          el.textContent = `❌ ${result.hint || result.error}`;
+          log.innerHTML = `🔴 <strong>${ts}</strong> — 测试失败：${escapeHtml(result.hint || result.error)}<br>` + log.innerHTML;
+        }
+      } catch (e) {
+        el.className = 'test-result fail';
+        el.textContent = '❌ 网络错误: ' + e.message;
+        log.innerHTML = `🔴 <strong>${ts}</strong> — 测试失败：${escapeHtml(e.message)}<br>` + log.innerHTML;
+      }
+    }
+
+    // ========== 版本检查 ==========
+    async function loadVersion() {
+      try {
+        const res = await fetch('/api/version');
+        const v = await res.json();
+        document.getElementById('versionNum').textContent = v.version || '1.0.0';
+      } catch (e) { /* ignore */ }
+    }
+
+    async function checkUpdate() {
+      const el = document.getElementById('sidebarVersion');
+      const orig = el.innerHTML;
+      el.innerHTML = 'Checking...';
+      el.style.color = 'var(--warning)';
+      try {
+        const res = await fetch('/api/check-update');
+        const data = await res.json();
+        if (data.hasUpdate) {
+          alert('New version available: ' + data.remote + '\n\nCurrent: ' + data.current + '\n\nPlease contact the developer for the latest version.');
+          el.style.color = 'var(--error)';
+        } else {
+          alert('You are using the latest version (' + data.current + ').');
+          el.style.color = 'var(--success)';
+        }
+      } catch (e) {
+        alert('Update check failed: ' + e.message);
+      }
+      setTimeout(() => { el.innerHTML = orig; el.style.color = '#ccc'; }, 2000);
+    }
+
+    // ========== 页面初始化 ==========
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadProxyConfig();
+      loadVersion();
+
+      // 加载话题列表
+      try {
+        const res = await fetch('/api/topics');
+        topicList = await res.json();
+        const select = document.getElementById('topicId');
+        select.innerHTML = topicList.map(t =>
+          `<option value="${t.id}" ${t.id === '47' ? 'selected' : ''}>${t.id} - ${t.name}</option>`
+        ).join('');
+      } catch (e) {
+        console.error('加载话题列表失败', e);
+      }
+    });
+
+    // ========== 工具函数 ==========
+    function getTopicName(topicId) {
+      const t = topicList.find(x => x.id === String(topicId));
+      return t ? t.name : `话题 #${topicId}`;
+    }
+
+    function setStatus(type, msg) {
+      const bar = document.getElementById('statusBar');
+      bar.className = 'status-bar ' + type;
+      bar.innerHTML = msg;
+    }
+
+    function clearStatus() {
+      const bar = document.getElementById('statusBar');
+      bar.className = 'status-bar';
+      bar.innerHTML = '';
+    }
+
+    function getRankClass(rank) {
+      if (rank === 1) return 'rank-1';
+      if (rank === 2) return 'rank-2';
+      if (rank === 3) return 'rank-3';
+      if (rank <= 10) return 'rank-4-10';
+      return '';
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // ========== DailyView 抓取逻辑 (SSE 实时进度) ==========
+    function startFetch() {
+      const btn = document.getElementById('btnFetch');
+      btn.disabled = true;
+      btn.textContent = '⏳ 抓取中...';
+
+      const topicId = document.getElementById('topicId').value.trim() || '47';
+      const range = document.getElementById('range').value;
+
+      let totalSoFar = 0, pageCount = 0;
+      setStatus('info', '<span class="spinner"></span>正在请求第 1 页...');
+
+      fetch('/api/fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topicId, range,
+          proxy: getProxyUrl(),
+          proxyType: getProxyType(),
+        }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          setStatus('error', `❌ 服务器错误: ${res.status}`);
+          btn.disabled = false;
+          btn.textContent = '🔍 抓取数据';
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          // 按 SSE 事件分隔符 \n\n 拆分完整事件
+          const events = buffer.split('\n\n');
+          buffer = events.pop() || ''; // 不完整的事件保留到下次
+
+          for (const evt of events) {
+            if (!evt.trim()) continue;
+            let eventType = '', dataStr = '';
+            for (const line of evt.split('\n')) {
+              if (line.startsWith('event: ')) eventType = line.slice(7).trim();
+              else if (line.startsWith('data: ')) dataStr = line.slice(6);
+            }
+            if (!dataStr) continue;
+            try {
+              const data = JSON.parse(dataStr);
+
+              if (eventType === 'page') {
+                pageCount = data.page;
+                totalSoFar = data.runningTotal;
+                setStatus('info', `<span class="spinner"></span>已抓取第 ${data.page} 页（${data.count} 条），累计 ${totalSoFar} 条`);
+              } else if (eventType === 'done') {
+                if (data.success) {
+                  fetchedData = data.items;
+                  document.getElementById('emptyCard').style.display = 'none';
+                  document.getElementById('dataCard').style.display = 'block';
+                  renderTable(data.items, topicId, range);
+                  setStatus('success', `✅ 成功！共 ${data.count} 条，分 ${pageCount} 页抓取完成`);
+                }
+              } else if (eventType === 'error') {
+                setStatus('error', `❌ 抓取失败: ${data.error}${data.hint ? '<br>💡 ' + data.hint : ''}`);
+              }
+            } catch (e) { /* JSON 解析失败 */ }
+          }
+        }
+      }).catch(e => {
+        setStatus('error', '❌ 网络请求失败: ' + e.message);
+      }).finally(() => {
+        btn.disabled = false;
+        btn.textContent = '🔍 抓取数据';
+      });
+    }
+
+    let currentPage = 1, pageSize = 10;
+
+    function renderItemRow(item) {
+      return `
+        <tr>
+          <td style="text-align:center;"><span class="rank-badge ${getRankClass(item.rank)}">${item.rank}</span></td>
+          <td>${escapeHtml(item.title || '-')}</td>
+          <td style="text-align:center;">${item.volume ? item.volume.toLocaleString() : '-'}</td>
+          <td style="text-align:center;">${escapeHtml(item.positive || '-')}</td>
+          <td style="text-align:center;">${escapeHtml(item.neutral || '-')}</td>
+          <td style="text-align:center;">${escapeHtml(item.negative || '-')}</td>
+          <td style="font-size:12px; color:#666;">${escapeHtml(item.keywords || '-')}</td>
+        </tr>`;
+    }
+
+    function renderPage(page) {
+      const tbody = document.getElementById('tableBody');
+      const start = (page - 1) * pageSize;
+      const pageItems = fetchedData.slice(start, start + pageSize);
+      tbody.innerHTML = pageItems.map(renderItemRow).join('');
+      renderPagination();
+    }
+
+    function renderPagination() {
+      const totalPages = Math.ceil(fetchedData.length / pageSize);
+      const pg = document.getElementById('pagination');
+      if (fetchedData.length <= 10) { pg.innerHTML = ''; return; }
+
+      let html = `<span style="font-size:13px;color:var(--text-secondary);">第 ${currentPage}/${totalPages} 页</span>`;
+      html += `<button class="btn btn-outline btn-sm" onclick="goPage(1)" ${currentPage===1?'disabled':''}>«</button>`;
+      html += `<button class="btn btn-outline btn-sm" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+      html += `<button class="btn btn-outline btn-sm" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>`;
+      html += `<button class="btn btn-outline btn-sm" onclick="goPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>»</button>`;
+      html += `<select style="height:30px;font-size:13px;margin-left:6px;border:1px solid var(--border);border-radius:4px;padding:0 4px;" onchange="setPageSize(this.value)">`;
+      [10, 20, 30, 50].forEach(n => {
+        html += `<option value="${n}" ${pageSize===n?'selected':''}>${n} 条/页</option>`;
+      });
+      html += `</select>`;
+      pg.innerHTML = html;
+    }
+
+    function setPageSize(size) {
+      pageSize = parseInt(size);
+      currentPage = 1;
+      renderPage(1);
+    }
+
+    function goPage(p) {
+      const total = Math.ceil(fetchedData.length / pageSize);
+      if (p < 1 || p > total) return;
+      currentPage = p;
+      renderPage(p);
+    }
+
+    function renderTable(items, topicId, range) {
+      fetchedData = items;
+      currentPage = 1;
+      const summary = document.getElementById('dataSummary');
+      const rangeLabel = { '1': '今日', '7': '本周', '30': '本月' }[range] || '自定义';
+      const topicLabel = getTopicName(topicId);
+      summary.innerHTML = `
+        <div class="summary-item"><div class="num">${items.length}</div><div class="label">数据条数</div></div>
+        <div class="summary-item"><div class="num">${topicLabel}</div><div class="label">话题分类</div></div>
+        <div class="summary-item"><div class="num">${rangeLabel}</div><div class="label">时间范围</div></div>
+      `;
+
+      if (items.length === 0) {
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#aaa;">暂无数据</td></tr>';
+        document.getElementById('pagination').innerHTML = '';
+        return;
+      }
+
+      renderPage(1);
+    }
+
+    async function exportData() {
+      if (fetchedData.length === 0) { setStatus('error', '❌ 没有数据可导出'); return; }
+
+      const btn = document.getElementById('btnExport');
+      btn.disabled = true;
+      btn.textContent = '⏳ 导出中...';
+
+      const topicId = document.getElementById('topicId').value.trim() || '47';
+      const range = document.getElementById('range').value;
+
+      try {
+        const res = await fetch('/api/export', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: fetchedData, topicId, range }),
+        });
+        const result = await res.json();
+        if (result.success) {
+          setStatus('success', `✅ Excel 已保存<br>📁 ${result.filename}<br>📌 ${result.filepath}`);
+          window.open('/api/download?file=' + encodeURIComponent(result.filename), '_blank');
+        } else {
+          setStatus('error', '❌ 导出失败: ' + result.error);
+        }
+      } catch (e) {
+        setStatus('error', '❌ 导出请求失败: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '📥 导出 Excel';
+      }
+    }
+
+    function clearAll() {
+      fetchedData = [];
+      document.getElementById('tableBody').innerHTML = '';
+      document.getElementById('dataSummary').innerHTML = '';
+      document.getElementById('dataCard').style.display = 'none';
+      document.getElementById('emptyCard').style.display = 'block';
+      clearStatus();
+    }
+
+    function previewPrint() { window.print(); }
+
+    // 回车键触发抓取
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
+        e.preventDefault();
+        const activePage = document.querySelector('.page.active');
+        if (activePage && activePage.id === 'page-dailyview') {
+          startFetch();
+        }
+      }
+    });
+  </script>
+</body>
+</html>

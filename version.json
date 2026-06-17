@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "buildDate": "2026-06-17",
+  "updateUrl": "https://gitee.com/cnbjs/MFData/raw/master/version.json",
+  "changelog": [
+    "DailyView 周榜数据抓取",
+    "多页自动抓取 + 实时进度",
+    "Excel 导出（含情绪分布、热门关键字）",
+    "全局代理配置 + 自动检测",
+    "抓取历史记录 + 下载",
+    "分页显示"
+  ]
+}
