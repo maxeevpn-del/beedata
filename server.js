@@ -479,11 +479,17 @@ const server = http.createServer(async (req, res) => {
             res.end(JSON.stringify({ 
               success: true, 
               updatedTo: newV.version,
-              message: '已更新到 ' + newV.version + '，请重启服务生效',
-              needRestart: true,
+              message: '已更新到 ' + newV.version + '，服务即将自动重启...',
+              needRestart: false,
             }));
-            // 1 秒后自动退出，让启动脚本重新拉起
-            setTimeout(() => { console.log('[更新] 服务即将重启...'); process.exit(0); }, 1500);
+            // 1.5 秒后自动重启
+            setTimeout(() => { 
+              console.log('[更新] 服务即将重启...');
+              const { spawn } = require('child_process');
+              const child = spawn(process.argv[0], [process.argv[1]], { detached: true, stdio: 'ignore' });
+              child.unref();
+              process.exit(0);
+            }, 1500);
             return;
           } catch (e) {
             res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
