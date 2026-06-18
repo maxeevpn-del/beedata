@@ -1,7 +1,8 @@
 {
-  "version": "1.0.6",
+  "version": "1.0.4",
   "buildDate": "2026-06-17",
   "updateUrl": "https://gitee.com/xtthmm/mfdata/raw/master/version.json",
+  "downloadUrl": "https://gitee.com/xtthmm/mfdata/repository/archive/master.zip",
   "changelog": [
     "DailyView 周榜数据抓取",
     "多页自动抓取 + 实时进度",

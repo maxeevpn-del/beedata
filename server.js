@@ -312,6 +312,24 @@ function serveStaticFile(res, urlPath) {
     res.writeHead(200, { 'Content-Type': mime }); res.end(data);
   });
 }
+function copyDir(src, dest, preserveFiles = []) {
+  if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      // 跳过 node_modules 和 .git
+      if (entry.name === 'node_modules' || entry.name === '.git') continue;
+      copyDir(srcPath, destPath, preserveFiles);
+    } else {
+      // 保留指定的文件（不覆盖 config.json 等）
+      if (preserveFiles.includes(entry.name) && fs.existsSync(destPath)) continue;
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
 function parseBody(req) {
   return new Promise(resolve => {
     let b = ''; req.on('data', c => b += c);
@@ -462,40 +480,74 @@ const server = http.createServer(async (req, res) => {
 
       const hasUpdate = remote ? (remote.version !== v.version) : false;
 
-      // 如果请求包含 action=upgrade，执行 git pull 升级
+      // 如果请求包含 action=upgrade，执行升级
       if (req.method === 'POST' && hasUpdate) {
         const body = await parseBody(req);
         if (body.action === 'upgrade') {
+          const downloadUrl = remote ? (remote.downloadUrl || v.downloadUrl) : (v.downloadUrl || '');
+
+          // 方案1: git pull（如果已安装 git）
           try {
             const { execSync } = require('child_process');
-            // 执行 git pull 拉取最新代码
-            const result = execSync('git pull origin master', { encoding: 'utf8', cwd: __dirname, timeout: 30000 });
-            console.log('[更新] git pull 成功:', result.trim());
+            const gitCheck = execSync('git --version 2>nul', { encoding: 'utf8', timeout: 2000 });
+            if (gitCheck) {
+              const pullRes = execSync('git pull origin master', { encoding: 'utf8', cwd: __dirname, timeout: 30000 });
+              console.log('[更新] git pull 成功:', pullRes.trim());
+              const newV = JSON.parse(fs.readFileSync(path.join(__dirname, 'version.json'), 'utf-8'));
+              res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+              res.end(JSON.stringify({ success: true, updatedTo: newV.version, method: 'git', message: '已更新到 ' + newV.version }));
+              setTimeout(() => { console.log('[更新] 服务即将重启...'); process.exit(0); }, 1500);
+              return;
+            }
+          } catch (e) { console.log('[更新] git 方式不可用，尝试下载...'); }
 
-            // 更新本地 version.json 为远程版本号（git pull 后自动覆盖）
-            const newV = JSON.parse(fs.readFileSync(path.join(__dirname, 'version.json'), 'utf-8'));
+          // 方案2: 下载 zip 覆盖（无需 git）
+          if (downloadUrl) {
+            try {
+              console.log('[更新] 从 ', downloadUrl, ' 下载更新包...');
+              const { execSync } = require('child_process');
 
-            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ 
-              success: true, 
-              updatedTo: newV.version,
-              message: '已更新到 ' + newV.version + '，服务即将自动重启...',
-              needRestart: false,
-            }));
-            // 1.5 秒后自动重启
-            setTimeout(() => { 
-              console.log('[更新] 服务即将重启...');
-              const { spawn } = require('child_process');
-              const child = spawn(process.argv[0], [process.argv[1]], { detached: true, stdio: 'ignore' });
-              child.unref();
-              process.exit(0);
-            }, 1500);
-            return;
-          } catch (e) {
-            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ success: false, error: 'git pull 失败: ' + (e.stderr || e.message) }));
-            return;
+              // 用 curl 下载 zip
+              execSync('curl -L -o update.zip "' + downloadUrl + '"', { cwd: __dirname, timeout: 60000 });
+              console.log('[更新] 下载完成，正在解压...');
+
+              // 解压到临时目录
+              execSync('powershell -Command "Expand-Archive -Path update.zip -DestinationPath _update_tmp -Force"', { cwd: __dirname, timeout: 30000 });
+
+              // 复制文件覆盖（保留 config.json、history.json）
+              const tmpDir = path.join(__dirname, '_update_tmp');
+              // zip 内含一个子目录（如 mfdata-master），找到它
+              const items = fs.readdirSync(tmpDir);
+              let srcDir = tmpDir;
+              for (const item of items) {
+                if (fs.statSync(path.join(tmpDir, item)).isDirectory()) {
+                  srcDir = path.join(tmpDir, item);
+                  break;
+                }
+              }
+
+              const preserveFiles = ['config.json', 'history.json'];
+              copyDir(srcDir, __dirname, preserveFiles);
+
+              // 清理
+              fs.rmSync(tmpDir, { recursive: true, force: true });
+              fs.unlinkSync(path.join(__dirname, 'update.zip'));
+
+              const newV = JSON.parse(fs.readFileSync(path.join(__dirname, 'version.json'), 'utf-8'));
+              res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+              res.end(JSON.stringify({ success: true, updatedTo: newV.version, method: 'download', message: '已更新到 ' + newV.version }));
+              setTimeout(() => { console.log('[更新] 服务即将重启...'); process.exit(0); }, 1500);
+              return;
+            } catch (e) {
+              res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+              res.end(JSON.stringify({ success: false, error: 'Download update failed: ' + (e.stderr || e.message) }));
+              return;
+            }
           }
+
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ success: false, error: 'No update method available (git or downloadUrl required)' }));
+          return;
         }
       }
 
@@ -506,7 +558,7 @@ const server = http.createServer(async (req, res) => {
         changelog: v.changelog || [],
         remote: remote ? remote.version : null,
         hasUpdate,
-        updateUrl: remote ? remote.downloadUrl || v.updateUrl : null,
+        updateUrl: remote ? (remote.downloadUrl || v.downloadUrl) : null,
       }));
     } catch { res.writeHead(500); res.end('{}'); }
     return;
