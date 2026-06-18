@@ -239,17 +239,36 @@ function setupIPC() {
       const agent = getProxyAgent(loadConfig().proxy, loadConfig().proxyType);
       const opts = { timeout: 120000, responseType: 'stream' };
       if (agent) { opts.httpsAgent = agent; opts.proxy = false; }
-      const res = await axios.get(downloadUrl, opts);
+
+      let response;
+      try {
+        response = await axios.get(downloadUrl, opts);
+        // 检查是否是 HTML 页面（Gitee 私有仓库会返回登录页）
+        const contentType = response.headers['content-type'] || '';
+        if (contentType.includes('text/html')) {
+          return { success: false, error: '无法访问更新包（仓库可能为私有，需要设置为公开）' };
+        }
+      } catch (e1) {
+        // 尝试带 token 的 API 方式
+        if (v.giteeToken) {
+          const apiUrl = `https://gitee.com/api/v5/repos/xtthmm/mfdata/zipball?access_token=${v.giteeToken}`;
+          console.log('[更新] 尝试 API 下载:', apiUrl);
+          response = await axios.get(apiUrl, opts);
+        } else {
+          return { success: false, error: '下载更新包失败，请设置仓库为公开或配置 Gitee Token' };
+        }
+      }
 
       const zipPath = path.join(__dirname, 'update.zip');
       const writer = fs.createWriteStream(zipPath);
-      res.data.pipe(writer);
+      response.data.pipe(writer);
       await new Promise((ok, err) => { writer.on('finish', ok); writer.on('error', err); });
       console.log('[更新] 下载完成，解压...');
 
       const tmpDir = path.join(__dirname, '_update_tmp');
       fs.rmSync(tmpDir, { recursive: true, force: true });
       fs.mkdirSync(tmpDir, { recursive: true });
+      const { execSync } = require('child_process');
       execSync('powershell -Command Expand-Archive -Path "' + zipPath + '" -DestinationPath "' + tmpDir + '" -Force', { stdio: 'ignore' });
 
       // 找到 zip 内的子目录
@@ -261,7 +280,7 @@ function setupIPC() {
       }
 
       // 复制文件到 app 目录
-      const appDir = __dirname; // 在打包环境中 __dirname 是 resources/app
+      const appDir = __dirname;
       const preserveFiles = ['config.json', 'history.json'];
       copyDirSync(srcDir, appDir, preserveFiles);
       console.log('[更新] 文件已覆盖');
@@ -271,10 +290,10 @@ function setupIPC() {
       fs.unlinkSync(zipPath);
 
       const newV = JSON.parse(fs.readFileSync(path.join(__dirname, 'version.json'), 'utf-8'));
-      // 2 秒后重启
       setTimeout(() => { app.relaunch(); app.exit(); }, 1500);
       return { success: true, updatedTo: newV.version, method: 'download' };
     } catch (e) {
+      console.error('[更新失败]', e);
       return { success: false, error: e.message };
     }
   });
