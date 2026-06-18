@@ -232,18 +232,6 @@ function setupIPC() {
   ipcMain.handle('api:upgrade', async () => {
     try {
       const v = JSON.parse(fs.readFileSync(path.join(__dirname, 'version.json'), 'utf-8'));
-      const { execSync } = require('child_process');
-
-      // 方案1: 尝试 git pull
-      try {
-        execSync('git pull origin master', { encoding: 'utf8', cwd: __dirname, timeout: 15000 });
-        const newV = JSON.parse(fs.readFileSync(path.join(__dirname, 'version.json'), 'utf-8'));
-        if (newV.version !== v.version) {
-          return { success: true, updatedTo: newV.version, method: 'git' };
-        }
-      } catch (e) { /* git not available */ }
-
-      // 方案2: 下载 zip 覆盖
       const downloadUrl = v.downloadUrl;
       if (!downloadUrl) return { success: false, error: 'No downloadUrl configured' };
 
