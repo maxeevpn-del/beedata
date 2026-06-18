@@ -448,18 +448,50 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // /api/check-update - 从远程获取最新版本号
-  if (url.pathname === '/api/check-update' && req.method === 'GET') {
+  // /api/check-update - 检查并可选执行更新
+  if (url.pathname === '/api/check-update') {
     try {
       const v = JSON.parse(fs.readFileSync(path.join(__dirname, 'version.json'), 'utf-8'));
       let remote = null;
       try {
-        // 尝试从 GitHub raw 或自定义 URL 获取最新版本
         if (v.updateUrl) {
           const remoteRes = await axios.get(v.updateUrl, { timeout: 8000, headers: { 'User-Agent': 'MFData-UpdateChecker/1.0' } });
           remote = remoteRes.data;
         }
       } catch (e) { /* remote check failed */ }
+
+      const hasUpdate = remote ? (remote.version !== v.version) : false;
+
+      // 如果请求包含 action=upgrade，执行 git pull 升级
+      if (req.method === 'POST' && hasUpdate) {
+        const body = await parseBody(req);
+        if (body.action === 'upgrade') {
+          try {
+            const { execSync } = require('child_process');
+            // 执行 git pull 拉取最新代码
+            const result = execSync('git pull origin master', { encoding: 'utf8', cwd: __dirname, timeout: 30000 });
+            console.log('[更新] git pull 成功:', result.trim());
+
+            // 更新本地 version.json 为远程版本号（git pull 后自动覆盖）
+            const newV = JSON.parse(fs.readFileSync(path.join(__dirname, 'version.json'), 'utf-8'));
+
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ 
+              success: true, 
+              updatedTo: newV.version,
+              message: '已更新到 ' + newV.version + '，请重启服务生效',
+              needRestart: true,
+            }));
+            // 1 秒后自动退出，让启动脚本重新拉起
+            setTimeout(() => { console.log('[更新] 服务即将重启...'); process.exit(0); }, 1500);
+            return;
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ success: false, error: 'git pull 失败: ' + (e.stderr || e.message) }));
+            return;
+          }
+        }
+      }
 
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
@@ -467,7 +499,7 @@ const server = http.createServer(async (req, res) => {
         buildDate: v.buildDate,
         changelog: v.changelog || [],
         remote: remote ? remote.version : null,
-        hasUpdate: remote ? (remote.version !== v.version) : false,
+        hasUpdate,
         updateUrl: remote ? remote.downloadUrl || v.updateUrl : null,
       }));
     } catch { res.writeHead(500); res.end('{}'); }

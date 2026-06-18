@@ -768,10 +768,28 @@
         const res = await fetch('/api/check-update');
         const data = await res.json();
         if (data.hasUpdate) {
-          alert('New version available: ' + data.remote + '\n\nCurrent: ' + data.current + '\n\nPlease contact the developer for the latest version.');
+          const doUpdate = confirm(
+            'New version available: v' + data.remote + '\n\n' +
+            'Current version: v' + data.current + '\n\n' +
+            'Click OK to upgrade now (requires git).\n' +
+            'Click Cancel to skip.'
+          );
+          if (doUpdate) {
+            const upRes = await fetch('/api/check-update', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'upgrade' }),
+            });
+            const upData = await upRes.json();
+            if (upData.success) {
+              alert('Upgrade successful to v' + upData.updatedTo + '. The service will restart automatically. Please refresh the page in a moment.');
+            } else {
+              alert('Upgrade failed: ' + (upData.error || 'unknown'));
+            }
+          }
           el.style.color = 'var(--error)';
         } else {
-          alert('You are using the latest version (' + data.current + ').');
+          alert('You are using the latest version (v' + data.current + ').');
           el.style.color = 'var(--success)';
         }
       } catch (e) {
