@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>蜜蜂数据</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="titlebar">
+    <span class="logo">📊</span>
+    <h1>蜜蜂数据 v<span id="titleVersion">1.0.5</span></h1>
+    <span id="proxyIndicator" class="proxy-indicator off">⚫ 未配置代理</span>
+    <span class="badge" id="titleBadge">v1.0.5</span>
+  </div>
+
+  <div class="main-layout">
+    <nav class="sidebar">
+      <div class="nav-section">数据源</div>
+      <div class="nav-item active" data-page="page-dailyview">
+        <span class="icon">📈</span>DailyView 周榜
+      </div>
+      <div class="nav-item" data-page="page-tvstats">
+        <span class="icon">📺</span>TV Stats 排行
+      </div>
+      <div class="nav-section">系统</div>
+      <div class="nav-item" data-page="page-settings">
+        <span class="icon">⚙️</span>全局设置
+      </div>
+      <div class="nav-item" data-page="page-history">
+        <span class="icon">📋</span>抓取记录
+      </div>
+      <div class="sidebar-spacer"></div>
+      <div class="sidebar-footer" id="sidebarVersion" style="cursor:pointer;" onclick="checkUpdate()" title="点击检查更新">
+        蜜蜂数据 v<span id="versionNum">1.0.0</span>
+      </div>
+    </nav>
+
+    <div class="content">
+
+      <div class="page active" id="page-dailyview">
+        <div class="card">
+          <div class="card-title"><span class="icon">⚙️</span> 抓取设置</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>话题分类</label>
+              <select id="topicId" style="min-width:220px;">
+                <option value="">加载中...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>时间范围</label>
+              <select id="range">
+                <option value="1">今日</option>
+                <option value="7" selected>本周</option>
+                <option value="30">本月</option>
+              </select>
+            </div>
+          </div>
+          <div class="hint" style="margin-top:8px;">
+            💡 代理配置在「全局设置」页面统一管理，所有数据源共享同一代理。
+          </div>
+          <div class="form-row" style="margin-top:14px;">
+            <button class="btn btn-primary" id="btnFetch" onclick="startFetch()">🔍 抓取数据</button>
+            <button class="btn btn-outline btn-sm" onclick="clearAll()">🗑 清除数据</button>
+          </div>
+          <div id="statusBar" class="status-bar"></div>
+        </div>
+
+        <div class="card" id="dataCard" style="display:none;">
+          <div class="card-title"><span class="icon">📋</span> 抓取结果</div>
+          <div class="data-summary" id="dataSummary"></div>
+          <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center;">
+            <button class="btn btn-success" id="btnExport" onclick="exportData()">📥 导出 Excel</button>
+            <button class="btn btn-outline btn-sm" onclick="previewPrint()">🖨 打印预览</button>
+            <div style="margin-left:auto; display:flex; gap:6px; align-items:center;" id="pagination"></div>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th rowspan="2" style="vertical-align:middle;">排名</th><th rowspan="2" style="vertical-align:middle;">名称</th><th rowspan="2" style="vertical-align:middle;">网路口碑</th><th colspan="3">情绪分布</th><th rowspan="2" style="vertical-align:middle;">热门关键字</th></tr>
+                <tr><th style="font-size:12px;text-align:center;">正面</th><th style="font-size:12px;text-align:center;">中立</th><th style="font-size:12px;text-align:center;">负面</th></tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" id="emptyCard">
+          <div class="empty-state">
+            <div class="icon">📡</div>
+            <p>点击「抓取数据」按钮开始获取 DailyView 周榜</p>
+            <p style="font-size:12px; color:#ccc; margin-top:6px;">请先在「全局设置」中配置代理地址</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="page" id="page-tvstats">
+        <div class="card">
+          <div class="card-title"><span class="icon">⚙️</span> 抓取设置</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>日期</label>
+              <input type="date" id="tvDate" style="height:36px;padding:0 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;outline:none;">
+            </div>
+          </div>
+          <div class="hint" style="margin-top:8px;">
+            💡 默认昨天日期。TelevisionStats 每日更新全球电视剧热度排行。
+          </div>
+          <div class="form-row" style="margin-top:14px;">
+            <button class="btn btn-primary" id="btnTVFetch" onclick="startTVFetch()">🔍 抓取数据</button>
+            <button class="btn btn-outline btn-sm" onclick="clearTVAll()">🗑 清除数据</button>
+          </div>
+          <div id="tvStatusBar" class="status-bar"></div>
+        </div>
+
+        <div class="card" id="tvDataCard" style="display:none;">
+          <div class="card-title"><span class="icon">📋</span> 抓取结果</div>
+          <div class="data-summary" id="tvDataSummary"></div>
+          <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center;">
+            <button class="btn btn-success" id="btnTVExport" onclick="exportTVData()">📥 导出 Excel</button>
+            <div style="margin-left:auto; display:flex; gap:6px; align-items:center;" id="tvPagination"></div>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th style="width:60px;">排名</th><th>剧名</th><th style="width:140px;">网络/平台</th><th style="width:80px;">热度分</th><th style="width:80px;">状态</th></tr>
+              </thead>
+              <tbody id="tvTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" id="tvEmptyCard">
+          <div class="empty-state">
+            <div class="icon">📺</div>
+            <p>选择日期后点击「抓取数据」获取 Television Stats 排行</p>
+            <p style="font-size:12px; color:#ccc; margin-top:6px;">数据源：televisionstats.com</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="page" id="page-history">
+        <div class="card">
+          <div class="card-title"><span class="icon">📋</span> 抓取记录</div>
+          <div class="table-wrapper" style="max-height:500px;">
+            <table style="table-layout:auto;">
+              <thead>
+                <tr><th style="width:60px;">类型</th><th style="width:100px;">时间</th><th style="width:90px;">数据源</th><th style="width:60px;">话题</th><th style="width:70px;">条数</th><th style="width:60px;">状态</th><th style="width:110px;">操作</th></tr>
+              </thead>
+              <tbody id="historyBody"><tr><td colspan="7" style="text-align:center;padding:30px;color:#aaa;">加载中...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="page" id="page-settings">
+        <div class="card">
+          <div class="card-title"><span class="icon">🌐</span> 代理设置</div>
+          <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px;">
+            为目标网站配置统一的代理地址。所有数据源（DailyView 等）均共享此代理设置。
+          </p>
+
+          <div class="setting-section">
+            <h3>代理配置</h3>
+            <div class="setting-row">
+              <label>代理地址</label>
+              <input type="text" id="settingsProxyUrl" placeholder="例如：http://127.0.0.1:7890">
+            </div>
+            <div class="setting-row">
+              <label>代理类型</label>
+              <select id="settingsProxyType">
+                <option value="http">HTTP 代理</option>
+                <option value="socks5">SOCKS5 代理</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <label></label>
+              <div>
+                <button class="btn btn-primary" onclick="saveAndApplyProxy()">💾 保存并应用</button>
+                <button class="btn btn-outline btn-sm" onclick="testProxy()" style="margin-left:8px;">🔗 测试连接</button>
+                <button class="btn btn-outline btn-sm" onclick="autoDetectProxy()" style="margin-left:8px;">🔎 自动检测</button>
+                <span id="testResult" class="test-result"></span>
+              </div>
+            </div>
+            <div class="hint" style="line-height:1.8;">
+              <strong>📖 Windows 查看代理端口的方法：</strong><br>
+              1. 打开代理软件（Clash / V2RayN / Shadowsocks 等）主界面<br>
+              2. 查看软件界面显示的 HTTP/SOCKS5 端口号<br>
+              3. 或打开 <code>Windows 设置 → 网络和 Internet → 代理</code> 查看地址和端口<br>
+              4. 常见默认端口：<br>
+              &nbsp;&nbsp;&nbsp;Clash <code>http://127.0.0.1:7890</code> &nbsp;|&nbsp;
+              V2Ray <code>socks5://127.0.0.1:10808</code><br>
+              &nbsp;&nbsp;&nbsp;Shadowsocks <code>socks5://127.0.0.1:1080</code> &nbsp;|&nbsp;
+              Clash Verge <code>http://127.0.0.1:7897</code>
+            </div>
+          </div>
+
+          <hr class="sep">
+
+          <div class="setting-section">
+            <h3>连接测试记录</h3>
+            <div id="connectionLog" style="font-size:13px; color:var(--text-secondary); min-height:40px; padding:10px; background:#fafafa; border-radius:6px; line-height:1.6;">
+              暂无测试记录，点击「测试连接」开始检测
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title"><span class="icon">📋</span> 已配置的数据源</div>
+          <div style="font-size:13px; color:var(--text-secondary);">
+            <table style="width:auto; min-width:400px;">
+              <thead><tr><th style="width:40px;"></th><th>名称</th><th>说明</th><th style="width:100px;">状态</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td>📈</td>
+                  <td>DailyView 周榜</td>
+                  <td>抓取 dailyview.tw Top100 话题周榜数据</td>
+                  <td style="text-align:center; color:var(--success);">✅ 已启用</td>
+                </tr>
+                <tr>
+                  <td>📺</td>
+                  <td>TV Stats 排行</td>
+                  <td>抓取 televisionstats.com 全球电视剧热度日榜</td>
+                  <td style="text-align:center; color:var(--success);">✅ 已启用</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="dailyview.js"></script>
+  <script src="tvstats.js"></script>
+  <script src="settings.js"></script>
+  <script src="history.js"></script>
+</body>
+</html>

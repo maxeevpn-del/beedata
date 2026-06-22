@@ -17,6 +17,11 @@ const updater = require('./updater.js');
 let mainWindow;
 
 // ========== 工具函数（从 server.js 迁移） ==========
+function getUserDataDir() {
+  const p = path.join(app.getPath('userData'), 'data');
+  try { fs.mkdirSync(p, { recursive: true }); } catch {}
+  return p;
+}
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 const HISTORY_FILE = path.join(__dirname, 'history.json');
 
@@ -162,17 +167,22 @@ function setupIPC() {
   });
 
   ipcMain.handle('api:test-proxy', async (event, data) => {
-    try {
-      const agent = getProxyAgent(data.proxy || '', data.proxyType || 'http');
-      const opts = { timeout: 10000, headers: { 'User-Agent': 'Mozilla/5.0' } };
-      if (agent) { opts.httpsAgent = agent; opts.proxy = false; }
-      const start = Date.now();
-      const rsp = await axios.get('https://dailyview.tw', opts);
-      const elapsed = Date.now() - start;
-      return { success: true, statusCode: rsp.status, elapsed: `${elapsed}ms`, message: `dailyview.tw 可访问 (${rsp.status}, ${elapsed}ms)` };
-    } catch (err) {
-      return { success: false, error: err.message, hint: (err.code === 'ETIMEDOUT' || err.code === 'ECONNREFUSED') ? '连接超时，请检查代理' : err.message };
+    const agent = getProxyAgent(data.proxy || '', data.proxyType || 'http');
+    const opts = { timeout: 10000, headers: { 'User-Agent': 'Mozilla/5.0' } };
+    if (agent) { opts.httpsAgent = agent; opts.proxy = false; }
+
+    const results = [];
+    for (const site of ['dailyview.tw', 'televisionstats.com']) {
+      try {
+        const start = Date.now();
+        const rsp = await axios.get(`https://${site}`, opts);
+        const elapsed = Date.now() - start;
+        results.push({ site, success: true, statusCode: rsp.status, elapsed: `${elapsed}ms` });
+      } catch (err) {
+        results.push({ site, success: false, error: err.message, hint: (err.code === 'ETIMEDOUT' || err.code === 'ECONNREFUSED') ? '连接超时，请检查代理' : err.message });
+      }
     }
+    return results;
   });
 
   ipcMain.handle('api:detect-proxy', () => {
@@ -187,7 +197,8 @@ function setupIPC() {
   });
 
   ipcMain.handle('api:check-update', async () => {
-    return updater.checkForUpdate();
+    const cfg = loadConfig();
+    return updater.checkForUpdate(cfg.proxy, cfg.proxyType);
   });
 
   ipcMain.handle('api:fetch', async (event, params) => {
@@ -212,6 +223,100 @@ function setupIPC() {
     return { success: true, count: allItems.length, items: allItems };
   });
 
+  // ========== TelevisionStats 抓取 ==========
+  async function fetchTVStatsHtml(dateStr, proxyUrl, proxyType) {
+    const url = `https://televisionstats.com/top/${dateStr}`;
+    const agent = getProxyAgent(proxyUrl, proxyType);
+    const opts = {
+      timeout: 30000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    };
+    if (agent) { opts.httpsAgent = agent; opts.proxy = false; }
+    const res = await axios.get(url, opts);
+    return res.data;
+  }
+
+  function parseTVStatsHtml(html) {
+    const items = [];
+    try {
+      const match = html.match(/__NEXT_DATA__"[^>]*>([^<]+)</);
+      if (!match) return items;
+      const data = JSON.parse(match[1]);
+      const shows = data?.props?.pageProps?.shows;
+      if (!Array.isArray(shows)) return items;
+      shows.forEach((entry, idx) => {
+        const show = entry.show || {};
+        const networks = (show.networks || []).map(n => n.name).join(', ');
+        items.push({
+          rank: idx + 1,
+          title: show.name || '-',
+          network: networks || '-',
+          buzzScore: entry.value != null ? entry.value.toFixed(1) : '-',
+          status: show.in_production ? '播出中' : '已完结',
+        });
+      });
+    } catch (e) { /* parse error */ }
+    return items;
+  }
+
+  ipcMain.handle('api:tv:fetch', async (event, params) => {
+    const { date, proxy, proxyType } = params;
+    const cfg = loadConfig();
+    const pUrl = proxy || cfg.proxy || '';
+    const pType = proxyType || cfg.proxyType || 'http';
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('fetch:progress', { page: 1, count: 0, runningTotal: 0 });
+      }
+      const html = await fetchTVStatsHtml(date, pUrl, pType);
+      const items = parseTVStatsHtml(html);
+      addHistoryRecord({ type: 'fetch', source: 'TV Stats', date, count: items.length, status: 'success' });
+      return { success: true, count: items.length, items };
+    } catch (err) {
+      addHistoryRecord({ type: 'fetch', source: 'TV Stats', date, count: 0, status: 'failed', error: err.message });
+      return { success: false, error: err.message };
+    }
+  });
+
+  async function exportTVStatsToExcel(items, date) {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('数据');
+    sheet.columns = [
+      { header: '排名', key: 'rank', width: 6 },
+      { header: '剧名', key: 'title', width: 40 },
+      { header: '网络/平台', key: 'network', width: 20 },
+      { header: '热度分', key: 'buzzScore', width: 10 },
+      { header: '状态', key: 'status', width: 10 },
+    ];
+    items.forEach((item, idx) => {
+      const row = sheet.addRow(item);
+      row.getCell(1).alignment = { horizontal: 'center' };
+      row.getCell(4).alignment = { horizontal: 'center' };
+      row.getCell(5).alignment = { horizontal: 'center' };
+      if (idx % 2 === 0) row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+    });
+    const now = new Date();
+    const ds = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+    const filename = `tvstats_${date}_${ds}.xlsx`;
+    const filepath = path.join(__dirname, filename);
+    await workbook.xlsx.writeFile(filepath);
+    return { filepath, filename };
+  }
+
+  ipcMain.handle('api:tv:export', async (event, params) => {
+    try {
+      const result = await exportTVStatsToExcel(params.items || [], params.date || '');
+      addHistoryRecord({ type: 'export', source: 'TV Stats', date: params.date, count: (params.items || []).length, status: 'success', filename: result.filename });
+      return { success: true, ...result };
+    } catch (err) {
+      addHistoryRecord({ type: 'export', source: 'TV Stats', status: 'failed', error: err.message });
+      return { success: false, error: err.message };
+    }
+  });
+
   ipcMain.handle('api:export', async (event, params) => {
     try {
       const result = await exportToExcel(params.items || [], params.topicId || '47', params.range || '7');
@@ -229,21 +334,36 @@ function setupIPC() {
       proxyType: loadConfig().proxyType,
     });
     if (result.success) {
-      setTimeout(() => { app.relaunch(); app.exit(); }, 1500);
+      setTimeout(() => { app.quit(); }, 1000);
     }
     return result;
   });
-}
+
+  ipcMain.handle('api:open-file', async (event, filepath) => {
+    try {
+      if (filepath && fs.existsSync(filepath)) shell.showItemInFolder(filepath);
+      return { success: true };
+    } catch (e) { return { success: false, error: e.message }; }
+  });
+
+  ipcMain.handle('api:open-history-file', async (event, filename) => {
+    try {
+      const fp = path.join(DATA_DIR, filename);
+      if (fs.existsSync(fp)) shell.showItemInFolder(fp);
+      return { success: true };
+    } catch (e) { return { success: false, error: e.message }; }
+  });}
 
 // ========== 窗口创建 ==========
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280, height: 860, minWidth: 960, minHeight: 640,
-    title: 'MFData - 数据抓取工具',
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
+    title: '蜜蜂数据',
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false },
+    icon: path.join(__dirname, 'assets', 'icon.ico'),
   });
   mainWindow.setMenuBarVisibility(false);
-  mainWindow.loadFile('index.html');
+  mainWindow.loadFile('renderer/index.html');
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
   mainWindow.on('closed', () => { mainWindow = null; app.quit(); process.exit(0); });

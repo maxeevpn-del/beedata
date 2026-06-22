@@ -1,14 +1,12 @@
 {
   "version": "1.0.5",
-  "buildDate": "2026-06-17",
+  "buildDate": "2026-06-22",
   "updateUrl": "https://gitee.com/xtthmm/mfdata/raw/master/version.json",
-  "downloadUrl": "https://gitee.com/xtthmm/mfdata/repository/archive/master.zip",
+  "downloadUrl": "https://gitee.com/xtthmm/mfdata/releases/download/v1.0.5/BeeData-Setup-1.0.5.exe",
   "changelog": [
-    "DailyView 周榜数据抓取",
-    "多页自动抓取 + 实时进度",
-    "Excel 导出（含情绪分布、热门关键字）",
-    "全局代理配置 + 自动检测",
-    "抓取历史记录 + 下载",
-    "分页显示"
+    "Added TelevisionStats global TV ranking",
+    "Proxy test checks both dailyview.tw and televisionstats.com",
+    "Data files stored in user directory, no admin required",
+    "Fixed installer launch issue"
   ]
 }

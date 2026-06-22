@@ -1,10 +1,40 @@
 {
-  "name": "dailyview-scraper",
-  "version": "1.0.0",
-  "description": "抓取 dailyview.tw 周榜数据并导出Excel",
-  "main": "server.js",
+  "name": "beedata",
+  "version": "1.0.5",
+  "description": "蜜蜂数据 - DailyView / TV Stats 数据抓取工具",
+  "main": "main.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "dist": "electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "com.beedata.tool",
+    "productName": "蜜蜂数据",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "updater.js",
+      "renderer/**",
+      "version.json",
+      "package.json"
+    ],
+    "asar": false,
+    "npmRebuild": false,
+    "electronDist": "node_modules/electron/dist",
+    "win": {
+      "target": "nsis",
+      "icon": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   },
   "dependencies": {
     "axios": "^1.7.0",
@@ -14,6 +44,8 @@
     "socks-proxy-agent": "^8.0.0"
   },
   "devDependencies": {
+    "electron": "^42.4.1",
+    "electron-builder": "^26.0.12",
     "nexe": "^5.0.0-beta.4",
     "pkg": "^5.8.1"
   }

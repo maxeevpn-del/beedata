@@ -1,6 +1,7 @@
 node_modules/
+dist/
 *.exe
 *.zip
+*.xlsx
 history.json
 config.json
-dailyview_*.xlsx
