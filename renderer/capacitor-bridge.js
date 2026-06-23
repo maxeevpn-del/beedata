@@ -72,12 +72,21 @@
 
     tvFetch: async (params) => {
       const { date } = params;
+      // Try COS cache first
+      try {
+        const cacheUrl = 'https://beedata-1251427456.cos.ap-beijing.myqcloud.com/tvstats-cache/' + (date ? date + '.json' : 'latest.json');
+        const cached = await httpGet(cacheUrl);
+        if (cached && cached.items && cached.items.length > 0) {
+          return { success: true, count: cached.items.length, items: cached.items, cached: true };
+        }
+      } catch {}
+      // Fallback to live fetch
       try {
         const url = `https://televisionstats.com/top/${date}`;
         const html = await httpGetText(url, { 'Accept-Language': 'en-US,en;q=0.9' });
         if (!html || html.length < 100) return { success: false, error: 'Empty response' };
-        if (html.includes('Just a moment') || html.includes('cf-browser-verification')) return { success: false, error: 'Blocked by Cloudflare' };
-        if (!html.includes('__NEXT_DATA__')) return { success: false, error: 'No data. Length:' + html.length + ' Starts:' + html.substring(0, 80) };
+        if (html.includes('Just a moment') || html.includes('cf-browser-verification')) return { success: false, error: 'Blocked by Cloudflare, using cached data if available' };
+        if (!html.includes('__NEXT_DATA__')) return { success: false, error: 'No data. Use desktop version for latest' };
         const items = parseTVStatsHTML(html);
         return { success: true, count: items.length, items };
       } catch (e) {
@@ -153,7 +162,7 @@
       return results;
     },
 
-    detectProxy: () => Promise.resolve({ found: false, proxy: null, message: '移动端使用系�?VPN 即可，无需手动配置代理' }),
+    detectProxy: () => Promise.resolve({ found: false, proxy: null, message: '移动端使用系�?VPN 即可，无需手动配置代理' }),
 
     getHistory: () => storageGet('history'),
     getVersion: () => Promise.resolve({ version: '1.0.6' }),
