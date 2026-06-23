@@ -18,7 +18,12 @@ if (isCapacitor) {
   async function httpGetText(url, extraHeaders = {}) {
     const res = await Http.request({
       method: 'GET', url,
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': 'text/html', ...extraHeaders },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        ...extraHeaders,
+      },
       connectTimeout: 15000, readTimeout: 30000,
     });
     if (typeof res.data === 'string') return res.data;
@@ -54,16 +59,13 @@ if (isCapacitor) {
       try {
         const url = `https://televisionstats.com/top/${date}`;
         const html = await httpGetText(url, { 'Accept-Language': 'en-US,en;q=0.9' });
-        // debug: check HTML
-        const hasData = html.includes('__NEXT_DATA__');
-        const subs = html.substring(0, 500);
-        if (!hasData) {
-          return { success: false, error: 'HTML missing __NEXT_DATA__. First 500 chars: ' + subs.substring(0, 200) };
-        }
+        if (!html || html.length < 100) return { success: false, error: 'Empty response' };
+        if (html.includes('Just a moment') || html.includes('cf-browser-verification')) return { success: false, error: 'Blocked by Cloudflare' };
+        if (!html.includes('__NEXT_DATA__')) return { success: false, error: 'No data. Length:' + html.length + ' Starts:' + html.substring(0, 80) };
         const items = parseTVStatsHTML(html);
-        return { success: true, count: items.length, items, debug: subs.substring(0, 200) };
+        return { success: true, count: items.length, items };
       } catch (e) {
-        return { success: false, error: 'TV Stats fetch failed: ' + (e.message || 'unknown') };
+        return { success: false, error: 'Fetch failed: ' + (e.message || 'unknown') };
       }
     },
 
