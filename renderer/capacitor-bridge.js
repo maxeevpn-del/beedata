@@ -18,10 +18,10 @@ if (isCapacitor) {
   async function httpGetText(url, extraHeaders = {}) {
     const res = await Http.request({
       method: 'GET', url,
-      headers: { 'User-Agent': 'Mozilla/5.0', ...extraHeaders },
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', ...extraHeaders },
       responseType: 'text', connectTimeout: 15000, readTimeout: 30000,
     });
-    return res.data;
+    return typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
   }
 
   function storageGet(key) {
@@ -46,10 +46,14 @@ if (isCapacitor) {
 
     tvFetch: async (params) => {
       const { date } = params;
-      const url = `https://televisionstats.com/top/${date}`;
-      const html = await httpGetText(url);
-      const items = parseTVStatsHTML(html);
-      return { success: true, count: items.length, items };
+      try {
+        const url = `https://televisionstats.com/top/${date}`;
+        const html = await httpGetText(url, { 'Accept-Language': 'en-US,en;q=0.9' });
+        const items = parseTVStatsHTML(html);
+        return { success: true, count: items.length, items };
+      } catch (e) {
+        return { success: false, error: 'TV Stats fetch failed: ' + (e.message || 'unknown') };
+      }
     },
 
     exportExcel: async (params) => {
