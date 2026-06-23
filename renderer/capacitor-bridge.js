@@ -54,8 +54,14 @@ if (isCapacitor) {
       try {
         const url = `https://televisionstats.com/top/${date}`;
         const html = await httpGetText(url, { 'Accept-Language': 'en-US,en;q=0.9' });
+        // debug: check HTML
+        const hasData = html.includes('__NEXT_DATA__');
+        const subs = html.substring(0, 500);
+        if (!hasData) {
+          return { success: false, error: 'HTML missing __NEXT_DATA__. First 500 chars: ' + subs.substring(0, 200) };
+        }
         const items = parseTVStatsHTML(html);
-        return { success: true, count: items.length, items };
+        return { success: true, count: items.length, items, debug: subs.substring(0, 200) };
       } catch (e) {
         return { success: false, error: 'TV Stats fetch failed: ' + (e.message || 'unknown') };
       }
