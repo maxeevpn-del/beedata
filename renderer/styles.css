@@ -318,6 +318,10 @@ tr:hover td { background: #f9fafb; }
 .test-result.testing { color: var(--warning); }
 
 /* ---- Scrollbar ---- */
+
+  /* Hide pagination on mobile */
+  #pagination, #tvPagination { display: none !important; }
+  #dataCard [style*="display:flex"] { justify-content: center; }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
@@ -545,6 +549,7 @@ tr:hover td { background: #f9fafb; }
 
   .rank-badge { width: 24px; height: 24px; font-size: 11px; }
 }
+
 
 
 

@@ -1,6 +1,6 @@
 // ========== TV Stats 抓取逻辑 ==========
 let tvData = [];
-let tvCurrentPage = 1, tvPageSize = 10;
+let tvCurrentPage = 1, tvPageSize = window.innerWidth < 768 ? 500 : 10;
 
 function getTodayStr() {
   const d = new Date();

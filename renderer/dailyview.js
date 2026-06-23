@@ -1,5 +1,5 @@
 // ========== DailyView 抓取逻辑 ==========
-let currentPage = 1, pageSize = 10;
+let currentPage = 1, pageSize = window.innerWidth < 768 ? 500 : 10;
 
 async function startFetch() {
   const btn = document.getElementById('btnFetch');
