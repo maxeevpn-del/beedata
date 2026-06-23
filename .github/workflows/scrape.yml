@@ -2,8 +2,11 @@ name: Daily TV Stats Scrape
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # UTC 2:00 = 北京时间 10:00
-  workflow_dispatch:       # 手动触发
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   scrape:
