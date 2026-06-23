@@ -1,43 +1,41 @@
-// Capacitor 端 API 桥接 - 和 electronAPI 接口一致
-// 在 Android 上通过 Capacitor 插件 + fetch 实现
-
+// Capacitor API bridge
 const isCapacitor = !!(window.Capacitor && window.Capacitor.Plugins);
 
 if (isCapacitor) {
-  const { Filesystem, Directory, Encoding } = window.Capacitor.Plugins;
+  const { Filesystem, Directory } = window.Capacitor.Plugins;
   const Share = window.Capacitor.Plugins.Share;
+  const Http = window.CapacitorHttp || window.Capacitor.Plugins.CapacitorHttp;
 
-  // HTTP 请求辅助
-  async function httpGet(url, opts = {}) {
-    const headers = { 'User-Agent': 'BeeData/1.0' };
-    const res = await fetch(url, { headers, ...opts });
-    return res.json();
-  }
-
-  async function httpPost(url, body) {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'User-Agent': 'BeeData/1.0' },
-      body: JSON.stringify(body),
+  async function httpGet(url, extraHeaders = {}) {
+    const res = await Http.request({
+      method: 'GET', url,
+      headers: { 'User-Agent': 'BeeData/1.0', ...extraHeaders },
+      connectTimeout: 15000, readTimeout: 30000,
     });
-    return res.json();
+    return res.data;
   }
 
-  // 存储
+  async function httpGetText(url, extraHeaders = {}) {
+    const res = await Http.request({
+      method: 'GET', url,
+      headers: { 'User-Agent': 'Mozilla/5.0', ...extraHeaders },
+      responseType: 'text', connectTimeout: 15000, readTimeout: 30000,
+    });
+    return res.data;
+  }
+
   function storageGet(key) {
     try { return JSON.parse(localStorage.getItem('beedata_' + key) || '{}'); } catch { return {}; }
   }
   function storageSet(key, val) { localStorage.setItem('beedata_' + key, JSON.stringify(val)); }
 
   window.electronAPI = {
-    // 抓取 DailyView - 使用 fetch 直连（需配置代理则通过服务端转发）
     fetch: async (params) => {
-      const { topicId = '47', range = '7', proxy } = params;
+      const { topicId = '47', range = '7' } = params;
       const allItems = [];
       for (let page = 1; page <= 10; page++) {
         const url = `https://dailyview.tw/top100/topic/${topicId}?range=${range}&page=${page}`;
-        const html = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'zh-TW' } }).then(r => r.text());
-        // 简单 DOM 解析 - 在 Capacitor 端用 DOMParser
+        const html = await httpGetText(url, { 'Accept-Language': 'zh-TW' });
         const items = parseDailyViewHTML(html);
         if (items.length === 0) break;
         allItems.push(...items);
@@ -46,28 +44,23 @@ if (isCapacitor) {
       return { success: true, count: allItems.length, items: allItems };
     },
 
-    // 抓取 TV Stats
     tvFetch: async (params) => {
       const { date } = params;
       const url = `https://televisionstats.com/top/${date}`;
-      const html = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-      }).then(r => r.text());
+      const html = await httpGetText(url);
       const items = parseTVStatsHTML(html);
       return { success: true, count: items.length, items };
     },
 
-    // Excel 导出 - 使用 Capacitor Filesystem
     exportExcel: async (params) => {
-      const { items, topicId, range } = params;
-      const ExcelJS = window.ExcelJS;
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet('数据');
+      const { items, topicId } = params;
+      const workbook = new window.ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('data');
       sheet.columns = [
-        { header: '排名', key: 'rank', width: 6 }, { header: '名称', key: 'title', width: 40 },
-        { header: '网路口碑', key: 'volume', width: 12 }, { header: '正面', key: 'positive', width: 8 },
-        { header: '中立', key: 'neutral', width: 8 }, { header: '负面', key: 'negative', width: 8 },
-        { header: '热门关键字', key: 'keywords', width: 30 },
+        { header: 'rank', key: 'rank', width: 6 }, { header: 'title', key: 'title', width: 40 },
+        { header: 'volume', key: 'volume', width: 12 }, { header: 'positive', key: 'positive', width: 8 },
+        { header: 'neutral', key: 'neutral', width: 8 }, { header: 'negative', key: 'negative', width: 8 },
+        { header: 'keywords', key: 'keywords', width: 30 },
       ];
       items.forEach(item => sheet.addRow(item));
       const buf = await workbook.xlsx.writeBuffer();
@@ -75,24 +68,18 @@ if (isCapacitor) {
       const now = new Date();
       const ds = `${now.getMonth()+1}${now.getDate()}_${now.getHours()}${now.getMinutes()}`;
       const filename = `dailyview_${topicId}_${ds}.xlsx`;
-      await Filesystem.writeFile({
-        path: filename,
-        data: base64,
-        directory: Directory.Documents,
-      });
+      await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Documents });
       return { success: true, filename, filepath: filename };
     },
 
-    // Excel 导出 TV Stats
     tvExport: async (params) => {
       const { items, date } = params;
-      const ExcelJS = window.ExcelJS;
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet('数据');
+      const workbook = new window.ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('data');
       sheet.columns = [
-        { header: '排名', key: 'rank', width: 6 }, { header: '剧名', key: 'title', width: 40 },
-        { header: '网络/平台', key: 'network', width: 20 }, { header: '热度分', key: 'buzzScore', width: 10 },
-        { header: '状态', key: 'status', width: 10 },
+        { header: 'rank', key: 'rank', width: 6 }, { header: 'title', key: 'title', width: 40 },
+        { header: 'network', key: 'network', width: 20 }, { header: 'buzzScore', key: 'buzzScore', width: 10 },
+        { header: 'status', key: 'status', width: 10 },
       ];
       items.forEach(item => sheet.addRow(item));
       const buf = await workbook.xlsx.writeBuffer();
@@ -102,33 +89,28 @@ if (isCapacitor) {
       return { success: true, filename, filepath: filename };
     },
 
-    // 话题列表
     getTopics: async () => {
       try {
-        const html = await fetch('https://dailyview.tw/top100', {
-          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'zh-TW' }
-        }).then(r => r.text());
+        const html = await httpGetText('https://dailyview.tw/top100', { 'Accept-Language': 'zh-TW' });
         const topics = [];
         const re = /\/top100\/topic\/(\d+)/g;
         let m;
         while ((m = re.exec(html)) !== null) {
           if (!topics.find(t => t.id === m[1])) topics.push({ id: m[1], name: '' });
         }
-        return topics.length > 0 ? topics : [{ id: '47', name: '娱乐/台剧' }];
-      } catch { return [{ id: '47', name: '娱乐/台剧' }]; }
+        return topics.length > 0 ? topics : [{ id: '47', name: 'entertainment' }];
+      } catch { return [{ id: '47', name: 'entertainment' }]; }
     },
 
-    // 配置（本地存储）
     getConfig: () => storageGet('config'),
     saveConfig: (params) => { storageSet('config', params); return { success: true }; },
 
-    // 代理测试 - 直连
     testProxy: async (params) => {
       const results = [];
       for (const site of ['dailyview.tw', 'televisionstats.com']) {
         try {
           const start = Date.now();
-          const r = await fetch(`https://${site}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+          const r = await Http.request({ method: 'GET', url: `https://${site}`, connectTimeout: 10000 });
           results.push({ site, success: true, statusCode: r.status, elapsed: (Date.now() - start) + 'ms' });
         } catch (e) {
           results.push({ site, success: false, error: e.message, hint: e.message });
@@ -137,40 +119,34 @@ if (isCapacitor) {
       return results;
     },
 
-    // 系统代理检测（移动端用 VPN 全局透明代理，无需配置）
     detectProxy: () => Promise.resolve({ found: false, proxy: null, message: '移动端使用系统 VPN 即可，无需手动配置代理' }),
 
-    // 历史记录
     getHistory: () => storageGet('history'),
     getVersion: () => Promise.resolve({ version: '1.0.6' }),
+
     checkUpdate: async () => {
       try {
-        const r = await fetch('https://beedata-1251427456.cos.ap-beijing.myqcloud.com/version.json', {
-          headers: { 'User-Agent': 'BeeData-UpdateChecker/1.0' }
-        });
-        const remote = await r.json();
+        const r = await Http.request({ method: 'GET', url: 'https://beedata-1251427456.cos.ap-beijing.myqcloud.com/version.json', connectTimeout: 10000 });
+        const remote = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
         return { current: '1.0.6', remote: remote.version, hasUpdate: remote.version !== '1.0.6', changelog: remote.changelog || [], downloadUrl: remote.downloadUrl, error: null };
       } catch (e) { return { current: '1.0.6', remote: null, hasUpdate: false, changelog: [], downloadUrl: '', error: e.message }; }
     },
+
     doUpgrade: () => Promise.resolve({ success: false, error: '请在手机浏览器中手动下载更新' }),
 
-    // 文件操作
     openFile: async (filepath) => {
-      try { await Share.share({ title: '分享文件', url: filepath, dialogTitle: '分享文件' }); } catch {}
+      try { await Share.share({ title: 'Share file', url: filepath }); } catch {}
       return { success: true };
     },
     openHistoryFile: async (filename) => {
-      try { await Share.share({ title: '打开文件', url: filename, dialogTitle: '打开文件' }); } catch {}
+      try { await Share.share({ title: 'Open file', url: filename }); } catch {}
       return { success: true };
     },
-
-    // 进度事件（移动端无 SSE，用轮询替代）
     onFetchProgress: (cb) => { window._fetchProgressCB = cb; return cb; },
     offFetchProgress: () => { window._fetchProgressCB = null; },
   };
 }
 
-// HTML 解析辅助（Capacitor 端无法用 Node cheerio，改用 DOMParser）
 function parseDailyViewHTML(html) {
   const items = [];
   const parser = new DOMParser();
@@ -209,13 +185,7 @@ function parseTVStatsHTML(html) {
     shows.forEach((entry, idx) => {
       const show = entry.show || {};
       const networks = (show.networks || []).map(n => n.name).join(', ');
-      items.push({
-        rank: idx + 1,
-        title: show.name || '-',
-        network: networks || '-',
-        buzzScore: entry.value != null ? entry.value.toFixed(1) : '-',
-        status: show.in_production ? '播出中' : '已完结',
-      });
+      items.push({ rank: idx + 1, title: show.name || '-', network: networks || '-', buzzScore: entry.value != null ? entry.value.toFixed(1) : '-', status: show.in_production ? '播出中' : '已完结' });
     });
   } catch {}
   return items;
