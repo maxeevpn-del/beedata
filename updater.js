@@ -17,7 +17,7 @@ function buildAgent(proxyUrl, proxyType) {
 
 async function checkForUpdate(proxyUrl, proxyType) {
   const local = getLocalVersion();
-  const agent = buildAgent(proxyUrl, proxyType);
+  const agent = proxyUrl ? buildAgent(proxyUrl, proxyType) : null;
   let remote = null;
   let error = null;
   try {

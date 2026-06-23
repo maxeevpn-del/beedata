@@ -197,8 +197,7 @@ function setupIPC() {
   });
 
   ipcMain.handle('api:check-update', async () => {
-    const cfg = loadConfig();
-    return updater.checkForUpdate(cfg.proxy, cfg.proxyType);
+    return updater.checkForUpdate();
   });
 
   ipcMain.handle('api:fetch', async (event, params) => {
