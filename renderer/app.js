@@ -103,7 +103,9 @@ async function checkUpdate() {
   el.style.color = 'var(--warning)';
   try {
     const data = await window.electronAPI.checkUpdate();
-    if (data.hasUpdate) {
+    if (data.error) {
+      showModal('检测失败', '无法连接更新服务器', data.error + '\n请检查网络或代理设置。', [{ label: '关闭', primary: true }]);
+    } else if (data.hasUpdate) {
       const changelog = (data.changelog || []).map(l => `<div class="changelog-item">${escapeHtml(l)}</div>`).join('');
       showModal('发现新版本', `v${data.current} → v${data.remote}`, changelog, [
         { label: '取消', onClick: () => { el.style.color = 'var(--error)'; } },

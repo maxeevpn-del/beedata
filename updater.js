@@ -19,6 +19,7 @@ async function checkForUpdate(proxyUrl, proxyType) {
   const local = getLocalVersion();
   const agent = buildAgent(proxyUrl, proxyType);
   let remote = null;
+  let error = null;
   try {
     if (local.updateUrl) {
       const opts = { timeout: 10000, headers: { 'User-Agent': 'BeeData-UpdateChecker/1.0' } };
@@ -26,13 +27,14 @@ async function checkForUpdate(proxyUrl, proxyType) {
       const r = await axios.get(local.updateUrl, opts);
       remote = r.data;
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) { error = e.code || e.message; }
   return {
     current: local.version,
     remote: remote ? remote.version : null,
     hasUpdate: remote ? remote.version !== local.version : false,
     changelog: remote ? (remote.changelog || []) : [],
     downloadUrl: remote ? (remote.downloadUrl || '') : '',
+    error,
   };
 }
 
