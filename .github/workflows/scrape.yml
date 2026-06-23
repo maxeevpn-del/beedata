@@ -69,19 +69,12 @@ jobs:
           "
 
       - name: Upload to COS
-        if: ${{ secrets.COS_SECRET_ID != '' }}
+        env:
+          COS_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_KEY: ${{ secrets.COS_SECRET_KEY }}
         run: |
-          node -e "
-          const COS = require('cos-nodejs-sdk-v5');
-          const fs = require('fs');
-          const cos = new COS({ SecretId: '${{ secrets.COS_SECRET_ID }}', SecretKey: '${{ secrets.COS_SECRET_KEY }}' });
-          const body = fs.readFileSync('tvstats-cache/latest.json');
-          const data = JSON.parse(body);
-          cos.putObject({ Bucket: 'beedata-1251427456', Region: 'ap-beijing', Key: 'tvstats-cache/latest.json', Body: body, ACL: 'public-read' }, (err) => {
-            if (err) { console.error(err); process.exit(1); }
-            console.log('COS uploaded');
-          });
-          "
+          test -n "$COS_ID" || { echo "COS not configured, skip"; exit 0; }
+          node -e 'const COS=require("cos-nodejs-sdk-v5"),fs=require("fs");const c=new COS({SecretId:process.env.COS_ID,SecretKey:process.env.COS_KEY});c.putObject({Bucket:"beedata-1251427456",Region:"ap-beijing",Key:"tvstats-cache/latest.json",Body:fs.readFileSync("tvstats-cache/latest.json"),ACL:"public-read"},e=>{if(e){console.error(e);process.exit(1)}console.log("COS OK")})'
 
       - name: Commit & Push
         run: |
