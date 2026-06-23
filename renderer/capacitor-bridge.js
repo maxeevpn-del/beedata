@@ -49,15 +49,23 @@
       },
 
       tvFetch: function(params) {
-        var date = params.date, cacheUrl = params.cacheUrl;
-        if (!cacheUrl) cacheUrl = 'https://raw.githubusercontent.com/maxeevpn-del/beedata/master/tvstats-cache/latest.json';
-        return httpGet(cacheUrl).then(function(cached) {
-          if (cached && cached.items && cached.items.length) return { success: true, count: cached.items.length, items: cached.items, cached: true };
-          return httpGetText('https://televisionstats.com/top/' + date, { 'Accept-Language': 'en-US' }).then(function(html) {
-            var items = parseTVStatsHTML(html);
-            return { success: true, count: items.length, items: items };
+        var date = params.date;
+        var cacheUrls = [
+          'https://beedata-1251427456.cos.ap-beijing.myqcloud.com/tvstats-cache/latest.json',
+          'https://raw.githubusercontent.com/maxeevpn-del/beedata/master/tvstats-cache/latest.json'
+        ];
+
+        function tryCache(i) {
+          if (i >= cacheUrls.length) return httpGetText('https://televisionstats.com/top/' + date, { 'Accept-Language': 'en-US' }).then(function(html) {
+            return { success: true, count: parseTVStatsHTML(html).length, items: parseTVStatsHTML(html) };
           });
-        }).catch(function(e) {
+          return httpGet(cacheUrls[i]).then(function(cached) {
+            if (cached && cached.items && cached.items.length) return { success: true, count: cached.items.length, items: cached.items, cached: true };
+            return tryCache(i + 1);
+          });
+        }
+
+        return tryCache(0).catch(function(e) {
           return { success: false, error: 'Fetch failed: ' + (e.message || 'unknown') };
         });
       },
