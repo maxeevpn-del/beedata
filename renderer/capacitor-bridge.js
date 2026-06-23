@@ -1,10 +1,15 @@
 // Capacitor API bridge
-const isCapacitor = !!(window.Capacitor && window.Capacitor.Plugins);
+(function() {
+  const isCap = !!(window.Capacitor && window.Capacitor.Plugins);
+  if (!isCap) return;
 
-if (isCapacitor) {
-  const { Filesystem, Directory } = window.Capacitor.Plugins;
-  const Share = window.Capacitor.Plugins.Share;
-  const Http = window.CapacitorHttp || window.Capacitor.Plugins.CapacitorHttp;
+  try {
+    const P = window.Capacitor.Plugins;
+    const Filesystem = P.Filesystem;
+    const Share = P.Share;
+    const Http = window.CapacitorHttp || P.CapacitorHttp;
+
+    if (!Http) { console.error('[bridge] CapacitorHttp plugin not found'); return; }
 
   async function httpGet(url, extraHeaders = {}) {
     const cfg = storageGet('config');
@@ -96,7 +101,7 @@ if (isCapacitor) {
       const now = new Date();
       const ds = `${now.getMonth()+1}${now.getDate()}_${now.getHours()}${now.getMinutes()}`;
       const filename = `dailyview_${topicId}_${ds}.xlsx`;
-      await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Documents });
+      await Filesystem.writeFile({ path: filename, data: base64, directory: Dir.Documents });
       return { success: true, filename, filepath: filename };
     },
 
@@ -113,7 +118,7 @@ if (isCapacitor) {
       const buf = await workbook.xlsx.writeBuffer();
       const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
       const filename = `tvstats_${date}.xlsx`;
-      await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Documents });
+      await Filesystem.writeFile({ path: filename, data: base64, directory: Dir.Documents });
       return { success: true, filename, filepath: filename };
     },
 
@@ -148,7 +153,7 @@ if (isCapacitor) {
       return results;
     },
 
-    detectProxy: () => Promise.resolve({ found: false, proxy: null, message: '移动端使用系�?VPN 即可，无需手动配置代理' }),
+    detectProxy: () => Promise.resolve({ found: false, proxy: null, message: '移动端使用系�?VPN 即可，无需手动配置代理' }),
 
     getHistory: () => storageGet('history'),
     getVersion: () => Promise.resolve({ version: '1.0.6' }),
@@ -213,9 +218,12 @@ function parseTVStatsHTML(html) {
     shows.forEach((entry, idx) => {
       const show = entry.show || {};
       const networks = (show.networks || []).map(n => n.name).join(', ');
-      items.push({ rank: idx + 1, title: show.name || '-', network: networks || '-', buzzScore: entry.value != null ? entry.value.toFixed(1) : '-', status: show.in_production ? '播出�? : '已完�? });
+      items.push({ rank: idx + 1, title: show.name || '-', network: networks || '-', buzzScore: entry.value != null ? entry.value.toFixed(1) : '-', status: show.in_production ? '播出�? : '已完�? });
     });
   } catch {}
   return items;
 }
+
+  } catch(e) { console.error('[bridge] init failed', e); }
+})();
 
