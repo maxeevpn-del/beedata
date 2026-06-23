@@ -460,24 +460,39 @@ tr:hover td { background: #f9fafb; }
 
   tbody tr {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px;
-    margin-bottom: 8px;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 12px;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    position: relative;
   }
   td {
     border: none;
-    padding: 2px 0;
-    font-size: 12px;
+    padding: 0;
+    font-size: 13px;
     white-space: normal !important;
     overflow: visible !important;
     text-overflow: unset !important;
   }
-  td:first-child { width: auto; }
+  td:first-child {
+    position: absolute;
+    top: 14px; right: 14px;
+    width: auto !important;
+  }
+  td:nth-child(2) {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    padding-right: 40px;
+    margin-bottom: 6px;
+  }
+  td:nth-child(n+3) {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: inline;
+    margin-right: 10px;
+  }
+  td:nth-child(n+3)::after { content: ""; }
 
   .titlebar {
     padding: 0 14px; height: 40px;
@@ -530,5 +545,6 @@ tr:hover td { background: #f9fafb; }
 
   .rank-badge { width: 24px; height: 24px; font-size: 11px; }
 }
+
 
 
