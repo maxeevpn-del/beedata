@@ -52,6 +52,7 @@ jobs:
           "
 
       - name: Scrape DailyView
+        continue-on-error: true
         run: |
           node -e "
           const axios = require('axios'), fs = require('fs');
