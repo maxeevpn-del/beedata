@@ -81,9 +81,8 @@ async function loadDashboardRecent() {
 }
 
 function navigateTo(pageId) {
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  const nav = document.querySelector(`.nav-item[data-page="${pageId}"]`);
-  if (nav) nav.classList.add('active');
+  document.querySelectorAll('.nav-item, .mobile-tab').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.nav-item[data-page="'+pageId+'"], .mobile-tab[data-page="'+pageId+'"]').forEach(n => n.classList.add('active'));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(pageId).classList.add('active');
   if (pageId === 'page-settings') refreshSettingsPage();
