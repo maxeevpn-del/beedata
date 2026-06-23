@@ -78,8 +78,11 @@
           var b64 = btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
           var d = new Date();
           var fn = 'dailyview_' + topicId + '_' + (d.getMonth()+1) + d.getDate() + '_' + d.getHours() + d.getMinutes() + '.xlsx';
-          return Filesystem.mkdir({ path: '', directory: DirEnum.Documents, recursive: true }).then(function() {
-            return Filesystem.writeFile({ path: fn, data: b64, directory: DirEnum.Documents, recursive: true }).then(function() { return { success: true, filename: fn }; });
+          var cacheDir = DirEnum.Cache || DirEnum.Documents;
+          return Filesystem.writeFile({ path: fn, data: b64, directory: cacheDir, recursive: true }).then(function() {
+            return Filesystem.getUri({ path: fn, directory: cacheDir }).then(function(uri) {
+              return Share.share({ title: 'Export Excel', url: uri.uri, dialogTitle: 'Save Excel' }).then(function() { return { success: true, filename: fn }; });
+            });
           });
         });
       },
@@ -91,8 +94,11 @@
         return wb.xlsx.writeBuffer().then(function(buf) {
           var b64 = btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
           var fn = 'tvstats_' + date + '.xlsx';
-          return Filesystem.mkdir({ path: '', directory: DirEnum.Documents, recursive: true }).then(function() {
-            return Filesystem.writeFile({ path: fn, data: b64, directory: DirEnum.Documents, recursive: true }).then(function() { return { success: true, filename: fn }; });
+          var cacheDir = DirEnum.Cache || DirEnum.Documents;
+          return Filesystem.writeFile({ path: fn, data: b64, directory: cacheDir, recursive: true }).then(function() {
+            return Filesystem.getUri({ path: fn, directory: cacheDir }).then(function(uri) {
+              return Share.share({ title: 'Export Excel', url: uri.uri, dialogTitle: 'Save Excel' }).then(function() { return { success: true, filename: fn }; });
+            });
           });
         });
       },
