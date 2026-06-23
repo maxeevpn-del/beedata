@@ -134,20 +134,21 @@ if (isCapacitor) {
     saveConfig: (params) => { storageSet('config', params); return { success: true }; },
 
     testProxy: async (params) => {
+      const sites = ['baidu.com', 'dailyview.tw', 'televisionstats.com'];
       const results = [];
-      for (const site of ['dailyview.tw', 'televisionstats.com']) {
+      for (const site of sites) {
         try {
           const start = Date.now();
-          const r = await Http.request({ method: 'GET', url: `https://${site}`, connectTimeout: 10000 });
-          results.push({ site, success: true, statusCode: r.status, elapsed: (Date.now() - start) + 'ms' });
+          const r = await Http.request({ method: 'GET', url: `https://${site}`, connectTimeout: 8000, readTimeout: 8000 });
+          results.push({ site, success: true, statusCode: r.status || 200, elapsed: (Date.now() - start) + 'ms' });
         } catch (e) {
-          results.push({ site, success: false, error: e.message, hint: e.message });
+          results.push({ site, success: false, error: e.message, hint: 'è¿žæŽ¥å¤±è´¥' });
         }
       }
       return results;
     },
 
-    detectProxy: () => Promise.resolve({ found: false, proxy: null, message: 'ç§»åŠ¨ç«¯ä½¿ç”¨ç³»ç»?VPN å³å¯ï¼Œæ— éœ€æ‰‹åŠ¨é…ç½®ä»£ç†' }),
+    detectProxy: () => Promise.resolve({ found: false, proxy: null, message: 'ç§»åŠ¨ç«¯ä½¿ç”¨ç³»ï¿½?VPN å³å¯ï¼Œæ— éœ€æ‰‹åŠ¨é…ç½®ä»£ç†' }),
 
     getHistory: () => storageGet('history'),
     getVersion: () => Promise.resolve({ version: '1.0.6' }),
@@ -188,14 +189,14 @@ function parseDailyViewHTML(html) {
     const title = titleMatch ? titleMatch[1].trim() : '';
     if (!title || title.length > 60) return;
     const text = block.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-    const vMatch = text.match(/¾WÂ·Â•Á¿\s*([\d,]+)\s*¹P/);
+    const vMatch = text.match(/ï¿½WÂ·Â•ï¿½ï¿½\s*([\d,]+)\s*ï¿½P/);
     const volume = vMatch ? parseInt(vMatch[1].replace(/,/g, '')) : 0;
-    const pos = text.match(/ÕýÃæ\s*(\d+)\s*%/);
-    const neu = text.match(/ÖÐÁ¢\s*(\d+)\s*%/);
-    const neg = text.match(/Ø“Ãæ\s*(\d+)\s*%/);
+    const pos = text.match(/ï¿½ï¿½ï¿½ï¿½\s*(\d+)\s*%/);
+    const neu = text.match(/ï¿½ï¿½ï¿½ï¿½\s*(\d+)\s*%/);
+    const neg = text.match(/Ø“ï¿½ï¿½\s*(\d+)\s*%/);
     let kw = '-';
-    const km = text.match(/ŸáéTêPæI×Ö\s*(.{1,50})/);
-    if (km) { let r = km[1].trim(); const ti = r.search(/[0-9]|Ê×í“|¿Ú±®|Â•Á¿ÅÅÐÐ|·ÖÎöÆÚég|Ê²üNÊÇ/); if (ti > 0) r = r.slice(0, ti).trim(); else if (ti === 0) r = ''; if (r.length > 0) kw = r; }
+    const km = text.match(/ï¿½ï¿½ï¿½Tï¿½Pï¿½Iï¿½ï¿½\s*(.{1,50})/);
+    if (km) { let r = km[1].trim(); const ti = r.search(/[0-9]|ï¿½ï¿½ï¿½|ï¿½Ú±ï¿½|Â•ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½|ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½g|Ê²ï¿½Nï¿½ï¿½/); if (ti > 0) r = r.slice(0, ti).trim(); else if (ti === 0) r = ''; if (r.length > 0) kw = r; }
     items.push({ rank, title, volume, positive: pos ? pos[1]+'%' : '-', neutral: neu ? neu[1]+'%' : '-', negative: neg ? neg[1]+'%' : '-', keywords: kw });
   });
   return items;
@@ -212,7 +213,7 @@ function parseTVStatsHTML(html) {
     shows.forEach((entry, idx) => {
       const show = entry.show || {};
       const networks = (show.networks || []).map(n => n.name).join(', ');
-      items.push({ rank: idx + 1, title: show.name || '-', network: networks || '-', buzzScore: entry.value != null ? entry.value.toFixed(1) : '-', status: show.in_production ? 'æ’­å‡ºä¸? : 'å·²å®Œç»? });
+      items.push({ rank: idx + 1, title: show.name || '-', network: networks || '-', buzzScore: entry.value != null ? entry.value.toFixed(1) : '-', status: show.in_production ? 'æ’­å‡ºï¿½? : 'å·²å®Œï¿½? });
     });
   } catch {}
   return items;

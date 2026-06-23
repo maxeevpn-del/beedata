@@ -172,7 +172,7 @@ function setupIPC() {
     if (agent) { opts.httpsAgent = agent; opts.proxy = false; }
 
     const results = [];
-    for (const site of ['dailyview.tw', 'televisionstats.com']) {
+    for (const site of ['baidu.com', 'dailyview.tw', 'televisionstats.com']) {
       try {
         const start = Date.now();
         const rsp = await axios.get(`https://${site}`, opts);
