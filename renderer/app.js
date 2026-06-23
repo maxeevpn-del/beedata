@@ -45,6 +45,7 @@ function setupNavigation() {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       const pageId = item.getAttribute('data-page');
       document.getElementById(pageId).classList.add('active');
+      if (pageId === 'page-dashboard') loadDashboard();
       if (pageId === 'page-settings') refreshSettingsPage();
       if (pageId === 'page-history') loadHistoryPage();
     });
@@ -98,33 +99,34 @@ async function loadVersion() {
 async function checkUpdate() {
   const el = document.getElementById('sidebarVersion');
   const orig = el.innerHTML;
-  el.innerHTML = 'Checking...';
+  el.innerHTML = '检查中...';
   el.style.color = 'var(--warning)';
   try {
     const data = await window.electronAPI.checkUpdate();
     if (data.hasUpdate) {
-      const changelog = (data.changelog || []).map(l => '  • ' + l).join('\n');
-      const doUpdate = confirm(
-        `发现新版本 v${data.remote}\n当前版本: v${data.current}\n\n更新内容:\n${changelog || '无'}\n\n点击确定开始下载更新`
-      );
-      if (doUpdate) {
-        el.innerHTML = 'Downloading...';
-        const upData = await window.electronAPI.doUpgrade();
-        if (upData.success) {
-          alert('安装包下载完成，程序即将退出。请在弹出的安装向导中完成更新。');
-        } else {
-          alert('下载失败: ' + (upData.error || 'unknown'));
-        }
-      }
-      el.style.color = 'var(--error)';
+      const changelog = (data.changelog || []).map(l => `<div class="changelog-item">${escapeHtml(l)}</div>`).join('');
+      showModal('发现新版本', `v${data.current} → v${data.remote}`, changelog, [
+        { label: '取消', onClick: () => { el.style.color = 'var(--error)'; } },
+        { label: '立即更新', primary: true, onClick: async () => {
+          el.innerHTML = '下载中...';
+          const upData = await window.electronAPI.doUpgrade();
+          if (upData.success) {
+            showModal('更新就绪', '', '安装包下载完成，程序即将退出。<br>请在弹出的安装向导中完成更新。', [
+              { label: '确定', primary: true }
+            ]);
+          } else {
+            showModal('下载失败', '', upData.error || '未知错误', [{ label: '关闭', primary: true }]);
+          }
+        }}
+      ]);
     } else {
-      alert('当前已是最新版本 v' + data.current);
+      showModal('已是最新版本', `v${data.current}`, '当前没有可用的更新。', [{ label: '好的', primary: true }]);
       el.style.color = 'var(--success)';
     }
   } catch (e) {
-    alert('检测更新失败: ' + e.message);
+    showModal('检测失败', '', e.message, [{ label: '关闭', primary: true }]);
   }
-  setTimeout(() => { el.innerHTML = orig; el.style.color = '#ccc'; }, 2000);
+  setTimeout(() => { el.innerHTML = orig; el.style.color = '#555f7a'; }, 2000);
 }
 
 // ========== 页面初始化 ==========
@@ -132,6 +134,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupNavigation();
   await loadProxyConfig();
   loadVersion();
+  loadDashboard();
 
   try {
     topicList = await window.electronAPI.getTopics();
@@ -154,8 +157,23 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
     e.preventDefault();
     const activePage = document.querySelector('.page.active');
-    if (activePage && activePage.id === 'page-dailyview') {
-      startFetch();
-    }
+    if (activePage && activePage.id === 'page-dailyview') { startFetch(); }
   }
 });
+
+function showModal(title, sub, body, actions) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalSub').textContent = sub || '';
+  document.getElementById('modalBody').innerHTML = body || '';
+  const ac = document.getElementById('modalActions');
+  ac.innerHTML = '';
+  (actions || []).forEach(a => {
+    const btn = document.createElement('button');
+    btn.className = a.primary ? 'btn btn-primary' : 'btn btn-cancel';
+    btn.textContent = a.label;
+    btn.onclick = () => { hideModal(); if (a.onClick) a.onClick(); };
+    ac.appendChild(btn);
+  });
+  document.getElementById('modalOverlay').classList.add('show');
+}
+function hideModal() { document.getElementById('modalOverlay').classList.remove('show'); }

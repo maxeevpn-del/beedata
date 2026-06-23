@@ -1,9 +1,9 @@
 ﻿!define APPNAME "蜜蜂数据"
-!define VERSION "1.0.5"
+!define VERSION "1.0.6"
 !define PUBLISHER "蜜蜂数据"
 
 Unicode true
-SetCompressor /SOLID zlib
+SetCompressor /SOLID lzma
 
 Icon "assets\icon.ico"
 UninstallIcon "assets\icon.ico"

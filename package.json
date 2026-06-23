@@ -1,7 +1,7 @@
 {
   "name": "beedata",
-  "version": "1.0.5",
-  "description": "蜜蜂数据 - DailyView / TV Stats 数据抓取工具",
+  "version": "1.0.6",
+  "description": "铚滆渹鏁版嵁 - DailyView / TV Stats 鏁版嵁鎶撳彇宸ュ叿",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -10,7 +10,7 @@
   },
   "build": {
     "appId": "com.beedata.tool",
-    "productName": "蜜蜂数据",
+    "productName": "铚滆渹鏁版嵁",
     "directories": {
       "output": "dist"
     },
