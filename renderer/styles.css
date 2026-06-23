@@ -512,7 +512,6 @@ tr:hover td { background: #f9fafb; }
   .mobile-tabs { display: flex; }
 
   body { overflow-x: hidden; }
-  * { max-width: 100vw; }
 
   .content {
     overflow-x: hidden;
@@ -529,10 +528,8 @@ tr:hover td { background: #f9fafb; }
   .btn { height: 40px; padding: 0 18px; font-size: 14px; }
   .btn-sm { height: 34px; padding: 0 14px; font-size: 13px; }
 
-  .table-wrapper {
-    overflow-x: auto; -webkit-overflow-scrolling: touch;
-  }
-  table { min-width: 600px; table-layout: auto; }
+  .table-wrapper { overflow-x: visible; }
+  table { min-width: unset; table-layout: auto; }
   th, td { padding: 8px 10px; font-size: 12px; }
 
   .stats-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -555,6 +552,7 @@ tr:hover td { background: #f9fafb; }
 
   .rank-badge { width: 24px; height: 24px; font-size: 11px; }
 }
+
 
 
 
