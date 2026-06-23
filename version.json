@@ -1,7 +1,7 @@
 {
   "version": "1.0.6",
   "buildDate": "2026-06-22",
-  "updateUrl": "https://gitee.com/xtthmm/mfdata/raw/master/version.json",
+  "updateUrl": "https://beedata-1251427456.cos.ap-beijing.myqcloud.com/version.json",
   "downloadUrl": "https://beedata-1251427456.cos.ap-beijing.myqcloud.com/BeeData-Setup-1.0.6.exe",
   "changelog": [
     "Added TelevisionStats global TV ranking",
