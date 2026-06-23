@@ -14,7 +14,11 @@
       var cfg = JSON.parse(localStorage.getItem('beedata_config') || '{}');
       var opts = { method: 'GET', url: url, headers: Object.assign({ 'User-Agent': 'BeeData/1.0' }, h || {}), connectTimeout: 15000, readTimeout: 30000 };
       if (cfg.proxy) { var u = cfg.proxy.replace(/^https?:\/\//, ''); opts.proxy = { host: u.split(':')[0], port: parseInt(u.split(':')[1]) || 8080 }; }
-      return Http.request(opts).then(function(r) { return r.data; });
+      return Http.request(opts).then(function(r) {
+        var d = r.data;
+        if (typeof d === 'string') { try { d = JSON.parse(d); } catch(e) {} }
+        return d;
+      });
     }
 
     function httpGetText(url, h) {
