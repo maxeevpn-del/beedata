@@ -58,6 +58,16 @@
   window.electronAPI = {
     fetch: async (params) => {
       const { topicId = '47', range = '7' } = params;
+      // Try GitHub cache for default topic/week
+      if (topicId === '47' && range === '7') {
+        try {
+          const cached = await httpGet('https://raw.githubusercontent.com/maxeevpn-del/beedata/master/dailyview-cache/latest.json');
+          if (cached && cached.items && cached.items.length > 0) {
+            return { success: true, count: cached.items.length, items: cached.items, cached: true };
+          }
+        } catch {}
+      }
+      // Live fallback
       const allItems = [];
       for (let page = 1; page <= 10; page++) {
         const url = `https://dailyview.tw/top100/topic/${topicId}?range=${range}&page=${page}`;
