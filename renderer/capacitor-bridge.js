@@ -1,244 +1,174 @@
-// Capacitor API bridge
 (function() {
-  const isCap = !!(window.Capacitor && window.Capacitor.Plugins);
+  var isCap = !!(window.Capacitor && window.Capacitor.Plugins);
   if (!isCap) return;
 
   try {
-    const P = window.Capacitor.Plugins;
-    const Filesystem = P.Filesystem;
-    const Share = P.Share;
-    const Http = window.CapacitorHttp || P.CapacitorHttp;
-
+    var P = window.Capacitor.Plugins;
+    var Filesystem = P.Filesystem;
+    var Share = P.Share;
+    var Http = window.CapacitorHttp || P.CapacitorHttp;
     if (!Http) { console.error('[bridge] CapacitorHttp plugin not found'); return; }
+    var DirEnum = Filesystem ? (Filesystem.Directory || { Documents: 0, Data: 1, Cache: 2 }) : { Documents: 0 };
 
-  async function httpGet(url, extraHeaders = {}) {
-    const cfg = storageGet('config');
-    const opts = {
-      method: 'GET', url,
-      headers: { 'User-Agent': 'BeeData/1.0', ...extraHeaders },
-      connectTimeout: 15000, readTimeout: 30000,
-    };
-    if (cfg.proxy) {
-      const u = cfg.proxy.replace(/^https?:\/\//, '');
-      opts.proxy = { host: u.split(':')[0], port: parseInt(u.split(':')[1]) || 8080 };
+    function httpGet(url, h) {
+      var cfg = JSON.parse(localStorage.getItem('beedata_config') || '{}');
+      var opts = { method: 'GET', url: url, headers: Object.assign({ 'User-Agent': 'BeeData/1.0' }, h || {}), connectTimeout: 15000, readTimeout: 30000 };
+      if (cfg.proxy) { var u = cfg.proxy.replace(/^https?:\/\//, ''); opts.proxy = { host: u.split(':')[0], port: parseInt(u.split(':')[1]) || 8080 }; }
+      return Http.request(opts).then(function(r) { return r.data; });
     }
-    const res = await Http.request(opts);
-    return res.data;
-  }
 
-  async function httpGetText(url, extraHeaders = {}) {
-    const cfg = storageGet('config');
-    const opts = {
-      method: 'GET', url,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        ...extraHeaders,
+    function httpGetText(url, h) {
+      var cfg = JSON.parse(localStorage.getItem('beedata_config') || '{}');
+      var opts = { method: 'GET', url: url, headers: Object.assign({ 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36', 'Accept': 'text/html' }, h || {}), connectTimeout: 15000, readTimeout: 30000 };
+      if (cfg.proxy) { var u = cfg.proxy.replace(/^https?:\/\//, ''); opts.proxy = { host: u.split(':')[0], port: parseInt(u.split(':')[1]) || 8080 }; }
+      return Http.request(opts).then(function(r) {
+        if (typeof r.data === 'string') return r.data;
+        return String(r.data);
+      });
+    }
+
+    function storageGet(k) { try { return JSON.parse(localStorage.getItem('beedata_' + k) || '{}'); } catch(e) { return {}; } }
+    function storageSet(k, v) { localStorage.setItem('beedata_' + k, JSON.stringify(v)); }
+
+    window.electronAPI = {
+      fetch: function(params) {
+        var topicId = params.topicId || '47', range = params.range || '7', all = [];
+        function fetchPage(p) {
+          return httpGetText('https://dailyview.tw/top100/topic/' + topicId + '?range=' + range + '&page=' + p, { 'Accept-Language': 'zh-TW' }).then(function(html) {
+            var items = parseDailyViewHTML(html);
+            if (!items.length) return;
+            all.push.apply(all, items);
+            if (p < 10) { return new Promise(function(r) { setTimeout(r, 500); }).then(function() { return fetchPage(p + 1); }); }
+          });
+        }
+        return fetchPage(1).then(function() { return { success: true, count: all.length, items: all }; });
       },
-      connectTimeout: 15000, readTimeout: 30000,
+
+      tvFetch: function(params) {
+        var date = params.date, cacheUrl = params.cacheUrl;
+        if (!cacheUrl) cacheUrl = 'https://raw.githubusercontent.com/maxeevpn-del/beedata/master/tvstats-cache/latest.json';
+        return httpGet(cacheUrl).then(function(cached) {
+          if (cached && cached.items && cached.items.length) return { success: true, count: cached.items.length, items: cached.items, cached: true };
+          return httpGetText('https://televisionstats.com/top/' + date, { 'Accept-Language': 'en-US' }).then(function(html) {
+            var items = parseTVStatsHTML(html);
+            return { success: true, count: items.length, items: items };
+          });
+        }).catch(function(e) {
+          return { success: false, error: 'Fetch failed: ' + (e.message || 'unknown') };
+        });
+      },
+
+      exportExcel: function(params) {
+        var items = params.items, topicId = params.topicId, wb = new window.ExcelJS.Workbook(), ws = wb.addWorksheet('data');
+        ws.columns = [{ header: 'rank', key: 'rank', width: 6 }, { header: 'title', key: 'title', width: 40 }, { header: 'volume', key: 'volume', width: 12 }, { header: 'positive', key: 'positive', width: 8 }, { header: 'neutral', key: 'neutral', width: 8 }, { header: 'negative', key: 'negative', width: 8 }, { header: 'keywords', key: 'keywords', width: 30 }];
+        items.forEach(function(i) { ws.addRow(i); });
+        return wb.xlsx.writeBuffer().then(function(buf) {
+          var b64 = btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
+          var d = new Date();
+          var fn = 'dailyview_' + topicId + '_' + (d.getMonth()+1) + d.getDate() + '_' + d.getHours() + d.getMinutes() + '.xlsx';
+          return Filesystem.writeFile({ path: fn, data: b64, directory: DirEnum.Documents }).then(function() { return { success: true, filename: fn }; });
+        });
+      },
+
+      tvExport: function(params) {
+        var items = params.items, date = params.date, wb = new window.ExcelJS.Workbook(), ws = wb.addWorksheet('data');
+        ws.columns = [{ header: 'rank', key: 'rank', width: 6 }, { header: 'title', key: 'title', width: 40 }, { header: 'network', key: 'network', width: 20 }, { header: 'buzzScore', key: 'buzzScore', width: 10 }, { header: 'status', key: 'status', width: 10 }];
+        items.forEach(function(i) { ws.addRow(i); });
+        return wb.xlsx.writeBuffer().then(function(buf) {
+          var b64 = btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
+          var fn = 'tvstats_' + date + '.xlsx';
+          return Filesystem.writeFile({ path: fn, data: b64, directory: DirEnum.Documents }).then(function() { return { success: true, filename: fn }; });
+        });
+      },
+
+      getTopics: function() {
+        return httpGetText('https://dailyview.tw/top100', { 'Accept-Language': 'zh-TW' }).then(function(html) {
+          var topics = [], re = /\/top100\/topic\/(\d+)/g, m;
+          while ((m = re.exec(html)) !== null) { if (!topics.find(function(t) { return t.id === m[1]; })) topics.push({ id: m[1], name: '' }); }
+          return topics.length ? topics : [{ id: '47', name: 'entertainment' }];
+        }).catch(function() { return [{ id: '47', name: 'entertainment' }]; });
+      },
+
+      getConfig: function() { return storageGet('config'); },
+      saveConfig: function(p) { storageSet('config', p); return { success: true }; },
+
+      testProxy: function(params) {
+        var sites = ['baidu.com', 'dailyview.tw', 'televisionstats.com'], results = [], promises = sites.map(function(site) {
+          return Http.request({ method: 'GET', url: 'https://' + site, connectTimeout: 8000, readTimeout: 8000 }).then(function(r) {
+            results.push({ site: site, success: true, statusCode: r.status || 200, elapsed: '' });
+          }).catch(function(e) {
+            results.push({ site: site, success: false, error: e.message, hint: 'Failed' });
+          });
+        });
+        return Promise.all(promises).then(function() { return results; });
+      },
+
+      detectProxy: function() { return Promise.resolve({ found: false, proxy: null, message: 'Use system VPN, no proxy needed' }); },
+      getHistory: function() { return storageGet('history'); },
+      getVersion: function() { return Promise.resolve({ version: '1.0.6' }); },
+
+      checkUpdate: function() {
+        return Http.request({ method: 'GET', url: 'https://beedata-1251427456.cos.ap-beijing.myqcloud.com/version.json', connectTimeout: 10000 }).then(function(r) {
+          var remote = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+          return { current: '1.0.6', remote: remote.version, hasUpdate: remote.version !== '1.0.6', changelog: remote.changelog || [], downloadUrl: remote.downloadUrl, error: null };
+        }).catch(function(e) { return { current: '1.0.6', remote: null, hasUpdate: false, error: e.message }; });
+      },
+
+      doUpgrade: function() { return Promise.resolve({ success: false, error: 'Please update manually in browser' }); },
+
+      openFile: function(filepath) {
+        return Share.share({ title: 'Share file', url: filepath }).catch(function() {}).then(function() { return { success: true }; });
+      },
+      openHistoryFile: function(filename) {
+        return Share.share({ title: 'Open file', url: filename }).catch(function() {}).then(function() { return { success: true }; });
+      },
+
+      onFetchProgress: function(cb) { window._fetchProgressCB = cb; return cb; },
+      offFetchProgress: function() { window._fetchProgressCB = null; },
     };
-    if (cfg.proxy) {
-      opts.proxy = { host: cfg.proxy.replace(/^https?:\/\//, '').split(':')[0], port: parseInt(cfg.proxy.split(':').pop()) || 8080 };
-    }
-    const res = await Http.request(opts);
-    if (typeof res.data === 'string') return res.data;
-    if (res.data instanceof ArrayBuffer) {
-      const decoder = new TextDecoder('utf-8');
-      return decoder.decode(res.data);
-    }
-    return String(res.data);
-  }
-
-  function storageGet(key) {
-    try { return JSON.parse(localStorage.getItem('beedata_' + key) || '{}'); } catch { return {}; }
-  }
-  function storageSet(key, val) { localStorage.setItem('beedata_' + key, JSON.stringify(val)); }
-
-  window.electronAPI = {
-    fetch: async (params) => {
-      const { topicId = '47', range = '7' } = params;
-      const allItems = [];
-      for (let page = 1; page <= 10; page++) {
-        const url = `https://dailyview.tw/top100/topic/${topicId}?range=${range}&page=${page}`;
-        const html = await httpGetText(url, { 'Accept-Language': 'zh-TW' });
-        const items = parseDailyViewHTML(html);
-        if (items.length === 0) break;
-        allItems.push(...items);
-        if (page > 1) await new Promise(r => setTimeout(r, 500));
-      }
-      return { success: true, count: allItems.length, items: allItems };
-    },
-
-    tvFetch: async (params) => {
-      const { date } = params;
-      // Try GitHub cache first
-      const cacheUrls = [
-        'https://raw.githubusercontent.com/maxeevpn-del/beedata/master/tvstats-cache/latest.json',
-        'https://beedata-1251427456.cos.ap-beijing.myqcloud.com/tvstats-cache/latest.json',
-      ];
-      for (const cacheUrl of cacheUrls) {
-        try {
-          const cached = await httpGet(cacheUrl);
-          if (cached && cached.items && cached.items.length > 0) {
-            return { success: true, count: cached.items.length, items: cached.items, cached: true };
-          }
-        } catch {}
-      }
-      // Fallback to live fetch
-      try {
-        const url = `https://televisionstats.com/top/${date}`;
-        const html = await httpGetText(url, { 'Accept-Language': 'en-US,en;q=0.9' });
-        if (!html || html.length < 100) return { success: false, error: 'Empty response' };
-        if (html.includes('Just a moment') || html.includes('cf-browser-verification')) return { success: false, error: 'Blocked by Cloudflare, using cached data if available' };
-        if (!html.includes('__NEXT_DATA__')) return { success: false, error: 'No data. Use desktop version for latest' };
-        const items = parseTVStatsHTML(html);
-        return { success: true, count: items.length, items };
-      } catch (e) {
-        return { success: false, error: 'Fetch failed: ' + (e.message || 'unknown') };
-      }
-    },
-
-    exportExcel: async (params) => {
-      const { items, topicId } = params;
-      const workbook = new window.ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet('data');
-      sheet.columns = [
-        { header: 'rank', key: 'rank', width: 6 }, { header: 'title', key: 'title', width: 40 },
-        { header: 'volume', key: 'volume', width: 12 }, { header: 'positive', key: 'positive', width: 8 },
-        { header: 'neutral', key: 'neutral', width: 8 }, { header: 'negative', key: 'negative', width: 8 },
-        { header: 'keywords', key: 'keywords', width: 30 },
-      ];
-      items.forEach(item => sheet.addRow(item));
-      const buf = await workbook.xlsx.writeBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-      const now = new Date();
-      const ds = `${now.getMonth()+1}${now.getDate()}_${now.getHours()}${now.getMinutes()}`;
-      const filename = `dailyview_${topicId}_${ds}.xlsx`;
-      await Filesystem.writeFile({ path: filename, data: base64, directory: Dir.Documents });
-      return { success: true, filename, filepath: filename };
-    },
-
-    tvExport: async (params) => {
-      const { items, date } = params;
-      const workbook = new window.ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet('data');
-      sheet.columns = [
-        { header: 'rank', key: 'rank', width: 6 }, { header: 'title', key: 'title', width: 40 },
-        { header: 'network', key: 'network', width: 20 }, { header: 'buzzScore', key: 'buzzScore', width: 10 },
-        { header: 'status', key: 'status', width: 10 },
-      ];
-      items.forEach(item => sheet.addRow(item));
-      const buf = await workbook.xlsx.writeBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-      const filename = `tvstats_${date}.xlsx`;
-      await Filesystem.writeFile({ path: filename, data: base64, directory: Dir.Documents });
-      return { success: true, filename, filepath: filename };
-    },
-
-    getTopics: async () => {
-      try {
-        const html = await httpGetText('https://dailyview.tw/top100', { 'Accept-Language': 'zh-TW' });
-        const topics = [];
-        const re = /\/top100\/topic\/(\d+)/g;
-        let m;
-        while ((m = re.exec(html)) !== null) {
-          if (!topics.find(t => t.id === m[1])) topics.push({ id: m[1], name: '' });
-        }
-        return topics.length > 0 ? topics : [{ id: '47', name: 'entertainment' }];
-      } catch { return [{ id: '47', name: 'entertainment' }]; }
-    },
-
-    getConfig: () => storageGet('config'),
-    saveConfig: (params) => { storageSet('config', params); return { success: true }; },
-
-    testProxy: async (params) => {
-      const sites = ['baidu.com', 'dailyview.tw', 'televisionstats.com'];
-      const results = [];
-      for (const site of sites) {
-        try {
-          const start = Date.now();
-          const r = await Http.request({ method: 'GET', url: `https://${site}`, connectTimeout: 8000, readTimeout: 8000 });
-          results.push({ site, success: true, statusCode: r.status || 200, elapsed: (Date.now() - start) + 'ms' });
-        } catch (e) {
-          results.push({ site, success: false, error: e.message, hint: '连接失败' });
-        }
-      }
-      return results;
-    },
-
-    detectProxy: () => Promise.resolve({ found: false, proxy: null, message: '移动端使用系�?VPN 即可，无需手动配置代理' }),
-
-    getHistory: () => storageGet('history'),
-    getVersion: () => Promise.resolve({ version: '1.0.6' }),
-
-    checkUpdate: async () => {
-      try {
-        const r = await Http.request({ method: 'GET', url: 'https://beedata-1251427456.cos.ap-beijing.myqcloud.com/version.json', connectTimeout: 10000 });
-        const remote = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
-        return { current: '1.0.6', remote: remote.version, hasUpdate: remote.version !== '1.0.6', changelog: remote.changelog || [], downloadUrl: remote.downloadUrl, error: null };
-      } catch (e) { return { current: '1.0.6', remote: null, hasUpdate: false, changelog: [], downloadUrl: '', error: e.message }; }
-    },
-
-    doUpgrade: () => Promise.resolve({ success: false, error: '请在手机浏览器中手动下载更新' }),
-
-    openFile: async (filepath) => {
-      try { await Share.share({ title: 'Share file', url: filepath }); } catch {}
-      return { success: true };
-    },
-    openHistoryFile: async (filename) => {
-      try { await Share.share({ title: 'Open file', url: filename }); } catch {}
-      return { success: true };
-    },
-    onFetchProgress: (cb) => { window._fetchProgressCB = cb; return cb; },
-    offFetchProgress: () => { window._fetchProgressCB = null; },
-  };
+  } catch(e) { console.error('[bridge]', e); }
+})();
 
 function parseDailyViewHTML(html) {
-  const items = [];
-  const clean = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
-  const blocks = clean.split(/(?=class="[^"]*ItemCard_rank_block[^"]*")/g).filter(b => b.includes('ItemCard_rank_block'));
-  blocks.forEach(block => {
+  var items = [];
+  var clean = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
+  var blocks = clean.split(/(?=class="[^"]*ItemCard_rank_block[^"]*")/g).filter(function(b) { return b.includes('ItemCard_rank_block'); });
+  blocks.forEach(function(block) {
     if (block.length > 25000) return;
-    const rankMatch = block.match(/ItemCard_ranking[^>]*>([^<]+)</);
-    const rank = rankMatch ? parseInt(rankMatch[1].trim()) : 0;
+    var rm = block.match(/ItemCard_ranking[^>]*>([^<]+)</);
+    var rank = rm ? parseInt(rm[1].trim()) : 0;
     if (rank < 1 || rank > 100) return;
-    const titleMatch = block.match(/ItemCard_item_title[^>]*>([^<]+)</);
-    const title = titleMatch ? titleMatch[1].trim() : '';
+    var tm = block.match(/ItemCard_item_title[^>]*>([^<]+)</);
+    var title = tm ? tm[1].trim() : '';
     if (!title || title.length > 60) return;
-    const text = block.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-    const vMatch = text.match(/�W·��\s*([\d,]+)\s*�P/);
-    const volume = vMatch ? parseInt(vMatch[1].replace(/,/g, '')) : 0;
-    const pos = text.match(/����\s*(\d+)\s*%/);
-    const neu = text.match(/����\s*(\d+)\s*%/);
-    const neg = text.match(/ؓ��\s*(\d+)\s*%/);
-    let kw = '-';
-    const km = text.match(/���T�P�I��\s*(.{1,50})/);
-    if (km) { let r = km[1].trim(); const ti = r.search(/[0-9]|���|�ڱ�|������|�������g|ʲ�N��/); if (ti > 0) r = r.slice(0, ti).trim(); else if (ti === 0) r = ''; if (r.length > 0) kw = r; }
-    items.push({ rank, title, volume, positive: pos ? pos[1]+'%' : '-', neutral: neu ? neu[1]+'%' : '-', negative: neg ? neg[1]+'%' : '-', keywords: kw });
+    var text = block.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    var vol = 0;
+    var vm = text.match(/([\d,]+)\s*\u7B46/);
+    if (vm) vol = parseInt(vm[1].replace(/,/g, ''));
+    var pm = text.match(/\u6B63\u9762\s*(\d+)\s*%/);
+    var nm = text.match(/\u4E2D\u7ACB\s*(\d+)\s*%/);
+    var gm = text.match(/\u8CA0\u9762\s*(\d+)\s*%/);
+    var kw = '-';
+    var km = text.match(/\u71B1\u9580\u95DC\u9375\u5B57\s*(.{1,50})/);
+    if (km) { var r = km[1].trim(); var ti = r.search(/[0-9]|\u9996\u9801|\u53E3\u7891|\u8072\u91CF\u6392\u884C|\u5206\u6790\u671F\u9593|\u4EC0\u9EBC\u662F/); if (ti > 0) r = r.slice(0, ti).trim(); else if (ti === 0) r = ''; if (r.length > 0) kw = r; }
+    items.push({ rank: rank, title: title, volume: vol, positive: pm ? pm[1]+'%' : '-', neutral: nm ? nm[1]+'%' : '-', negative: gm ? gm[1]+'%' : '-', keywords: kw });
   });
   return items;
 }
 
 function parseTVStatsHTML(html) {
-  const items = [];
+  var items = [];
   try {
-    const match = html.match(/__NEXT_DATA__"[^>]*>([^<]+)</);
-    if (!match) return items;
-    const data = JSON.parse(match[1]);
-    const shows = data?.props?.pageProps?.shows;
+    var m = html.match(/__NEXT_DATA__"[^>]*>([^<]+)</);
+    if (!m) return items;
+    var data = JSON.parse(m[1]);
+    var shows = data.props.pageProps.shows;
     if (!Array.isArray(shows)) return items;
-    shows.forEach((entry, idx) => {
-      const show = entry.show || {};
-      const networks = (show.networks || []).map(n => n.name).join(', ');
+    shows.forEach(function(entry, idx) {
+      var show = entry.show || {};
+      var networks = (show.networks || []).map(function(n) { return n.name; }).join(', ');
       items.push({ rank: idx + 1, title: show.name || '-', network: networks || '-', buzzScore: entry.value != null ? entry.value.toFixed(1) : '-', status: show.in_production ? 'On Air' : 'Ended' });
     });
-  } catch {}
+  } catch(e) {}
   return items;
 }
-
-  } catch(e) { console.error('[bridge] init failed', e); }
-})();
-
-
-
