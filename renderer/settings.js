@@ -1,4 +1,3 @@
-// ========== 璁剧疆椤甸潰閫昏緫 ==========
 function refreshSettingsPage() {
   document.getElementById('settingsProxyUrl').value = globalProxy.url;
   document.getElementById('settingsProxyType').value = globalProxy.type;
@@ -11,12 +10,12 @@ async function saveAndApplyProxy() {
   try {
     await saveProxyConfig(url, type);
     document.getElementById('testResult').className = 'test-result ok';
-    document.getElementById('testResult').textContent = '鉁?宸蹭繚瀛?;
+    document.getElementById('testResult').textContent = 'Saved';
     setTimeout(() => { document.getElementById('testResult').textContent = ''; }, 2000);
     refreshSettingsPage();
   } catch (e) {
     document.getElementById('testResult').className = 'test-result fail';
-    document.getElementById('testResult').textContent = '鉂?淇濆瓨澶辫触';
+    document.getElementById('testResult').textContent = 'Save failed';
   }
 }
 
@@ -28,12 +27,12 @@ async function testProxy() {
 
   if (!url) {
     el.className = 'test-result fail';
-    el.textContent = '鉂?璇峰厛杈撳叆浠ｇ悊鍦板潃';
+    el.textContent = 'Please enter proxy URL';
     return;
   }
 
   el.className = 'test-result testing';
-  el.textContent = '鈴?姝ｅ湪娴嬭瘯 dailyview.tw / televisionstats.com ...';
+  el.textContent = 'Testing baidu / dailyview / televisionstats ...';
   const now = new Date();
   const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
 
@@ -42,32 +41,29 @@ async function testProxy() {
     const allOk = results.every(r => r.success);
     if (allOk) {
       el.className = 'test-result ok';
-      el.textContent = `鉁?鍏ㄩ儴閫氳繃 (${results.map(r => r.elapsed).join(' / ')})`;
+      el.textContent = 'All passed (' + results.map(r => r.elapsed).join(' / ') + ')';
       await saveProxyConfig(url, type);
     } else {
       el.className = 'test-result fail';
-      el.textContent = '鉂?閮ㄥ垎绔欑偣涓嶉€?;
+      el.textContent = 'Some failed';
     }
     let logHtml = '';
     for (const r of results) {
-      if (r.success) {
-        logHtml += `馃煝 <strong>${ts}</strong> 鈥?${r.site} 鍙闂?(${r.statusCode}, ${r.elapsed})<br>`;
-      } else {
-        logHtml += `馃敶 <strong>${ts}</strong> 鈥?${r.site} 澶辫触锛?{escapeHtml(r.hint || r.error)}<br>`;
-      }
+      if (r.success) logHtml += `OK ${ts} - ${r.site} (${r.statusCode}, ${r.elapsed})<br>`;
+      else logHtml += `FAIL ${ts} - ${r.site}: ${escapeHtml(r.hint || r.error)}<br>`;
     }
     log.innerHTML = logHtml + log.innerHTML;
   } catch (e) {
     el.className = 'test-result fail';
-    el.textContent = '鉂?缃戠粶閿欒: ' + e.message;
-    log.innerHTML = `馃敶 <strong>${ts}</strong> 鈥?娴嬭瘯澶辫触锛?{escapeHtml(e.message)}<br>` + log.innerHTML;
+    el.textContent = 'Error: ' + e.message;
+    log.innerHTML = `FAIL ${ts} - ${escapeHtml(e.message)}<br>` + log.innerHTML;
   }
 }
 
 async function autoDetectProxy() {
   const el = document.getElementById('testResult');
   el.className = 'test-result testing';
-  el.textContent = '鈴?姝ｅ湪妫€娴嬬郴缁熶唬鐞?..';
+  el.textContent = 'Detecting...';
 
   try {
     const data = await window.electronAPI.detectProxy();
@@ -75,15 +71,15 @@ async function autoDetectProxy() {
       document.getElementById('settingsProxyUrl').value = data.proxy.url;
       document.getElementById('settingsProxyType').value = data.proxy.type || 'http';
       el.className = 'test-result ok';
-      el.textContent = `鉁?宸叉娴嬪埌浠ｇ悊锛?{data.proxy.url}`;
+      el.textContent = 'Found: ' + data.proxy.url;
       await saveProxyConfig(data.proxy.url, data.proxy.type || 'http');
       refreshSettingsPage();
     } else {
       el.className = 'test-result fail';
-      el.textContent = '鉂?鏈娴嬪埌绯荤粺浠ｇ悊锛岃鎵嬪姩杈撳叆';
+      el.textContent = data.message || 'Not found';
     }
   } catch (e) {
     el.className = 'test-result fail';
-    el.textContent = '鉂?妫€娴嬪け璐? ' + e.message;
+    el.textContent = 'Failed: ' + e.message;
   }
 }
