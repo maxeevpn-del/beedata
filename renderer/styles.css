@@ -510,6 +510,7 @@ tr:hover td { background: #f9fafb; }
 
   .sidebar { display: none; }
   .mobile-tabs { display: flex; }
+  .main-layout { overflow-x: hidden; }
 
   body { overflow-x: hidden; }
 
