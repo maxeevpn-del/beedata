@@ -137,8 +137,8 @@ if (isCapacitor) {
       return results;
     },
 
-    // 系统代理检测（移动端不支持）
-    detectProxy: () => Promise.resolve({ found: false, proxy: null }),
+    // 系统代理检测（移动端用 VPN 全局透明代理，无需配置）
+    detectProxy: () => Promise.resolve({ found: false, proxy: null, message: '移动端使用系统 VPN 即可，无需手动配置代理' }),
 
     // 历史记录
     getHistory: () => storageGet('history'),
