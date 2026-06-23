@@ -18,10 +18,15 @@ if (isCapacitor) {
   async function httpGetText(url, extraHeaders = {}) {
     const res = await Http.request({
       method: 'GET', url,
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', ...extraHeaders },
-      responseType: 'text', connectTimeout: 15000, readTimeout: 30000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept': 'text/html', ...extraHeaders },
+      connectTimeout: 15000, readTimeout: 30000,
     });
-    return typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+    if (typeof res.data === 'string') return res.data;
+    if (res.data instanceof ArrayBuffer) {
+      const decoder = new TextDecoder('utf-8');
+      return decoder.decode(res.data);
+    }
+    return String(res.data);
   }
 
   function storageGet(key) {
