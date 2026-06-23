@@ -25,28 +25,18 @@ async function testProxy() {
   const el = document.getElementById('testResult');
   const log = document.getElementById('connectionLog');
 
-  if (!url) {
-    el.className = 'test-result fail';
-    el.textContent = 'Please enter proxy URL';
-    return;
-  }
-
   el.className = 'test-result testing';
-  el.textContent = 'Testing baidu / dailyview / televisionstats ...';
+  const target = url || 'direct connection';
+  el.textContent = 'Testing ' + target + ' ...';
   const now = new Date();
   const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
 
   try {
     const results = await window.electronAPI.testProxy({ proxy: url, proxyType: type });
     const allOk = results.every(r => r.success);
-    if (allOk) {
-      el.className = 'test-result ok';
-      el.textContent = 'All passed (' + results.map(r => r.elapsed).join(' / ') + ')';
-      await saveProxyConfig(url, type);
-    } else {
-      el.className = 'test-result fail';
-      el.textContent = 'Some failed';
-    }
+    el.className = allOk ? 'test-result ok' : 'test-result fail';
+    el.textContent = allOk ? 'All passed' : 'Some failed';
+    if (allOk && url) await saveProxyConfig(url, type);
     let logHtml = '';
     for (const r of results) {
       if (r.success) logHtml += `OK ${ts} - ${r.site} (${r.statusCode}, ${r.elapsed})<br>`;
@@ -56,7 +46,7 @@ async function testProxy() {
   } catch (e) {
     el.className = 'test-result fail';
     el.textContent = 'Error: ' + e.message;
-    log.innerHTML = `FAIL ${ts} - ${escapeHtml(e.message)}<br>` + log.innerHTML;
+    log.innerHTML = `ERR ${ts} - ${escapeHtml(e.message)}<br>` + log.innerHTML;
   }
 }
 
