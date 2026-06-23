@@ -7,16 +7,23 @@ if (isCapacitor) {
   const Http = window.CapacitorHttp || window.Capacitor.Plugins.CapacitorHttp;
 
   async function httpGet(url, extraHeaders = {}) {
-    const res = await Http.request({
+    const cfg = storageGet('config');
+    const opts = {
       method: 'GET', url,
       headers: { 'User-Agent': 'BeeData/1.0', ...extraHeaders },
       connectTimeout: 15000, readTimeout: 30000,
-    });
+    };
+    if (cfg.proxy) {
+      const u = cfg.proxy.replace(/^https?:\/\//, '');
+      opts.proxy = { host: u.split(':')[0], port: parseInt(u.split(':')[1]) || 8080 };
+    }
+    const res = await Http.request(opts);
     return res.data;
   }
 
   async function httpGetText(url, extraHeaders = {}) {
-    const res = await Http.request({
+    const cfg = storageGet('config');
+    const opts = {
       method: 'GET', url,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36',
@@ -25,7 +32,11 @@ if (isCapacitor) {
         ...extraHeaders,
       },
       connectTimeout: 15000, readTimeout: 30000,
-    });
+    };
+    if (cfg.proxy) {
+      opts.proxy = { host: cfg.proxy.replace(/^https?:\/\//, '').split(':')[0], port: parseInt(cfg.proxy.split(':').pop()) || 8080 };
+    }
+    const res = await Http.request(opts);
     if (typeof res.data === 'string') return res.data;
     if (res.data instanceof ArrayBuffer) {
       const decoder = new TextDecoder('utf-8');
