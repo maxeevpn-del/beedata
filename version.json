@@ -2,7 +2,7 @@
   "version": "1.0.6",
   "buildDate": "2026-06-22",
   "updateUrl": "https://gitee.com/xtthmm/mfdata/raw/master/version.json",
-  "downloadUrl": "https://gitee.com/xtthmm/mfdata/releases/download/v1.0.5/BeeData-Setup-1.0.5.exe",
+  "downloadUrl": "https://gitee.com/xtthmm/mfdata/releases/download/v1.0.6/BeeData-Setup-1.0.6.exe",
   "changelog": [
     "Added TelevisionStats global TV ranking",
     "Proxy test checks both dailyview.tw and televisionstats.com",
