@@ -72,14 +72,19 @@
 
     tvFetch: async (params) => {
       const { date } = params;
-      // Try COS cache first
-      try {
-        const cacheUrl = 'https://beedata-1251427456.cos.ap-beijing.myqcloud.com/tvstats-cache/' + (date ? date + '.json' : 'latest.json');
-        const cached = await httpGet(cacheUrl);
-        if (cached && cached.items && cached.items.length > 0) {
-          return { success: true, count: cached.items.length, items: cached.items, cached: true };
-        }
-      } catch {}
+      // Try GitHub cache first
+      const cacheUrls = [
+        'https://raw.githubusercontent.com/maxeevpn-del/beedata/master/tvstats-cache/latest.json',
+        'https://beedata-1251427456.cos.ap-beijing.myqcloud.com/tvstats-cache/latest.json',
+      ];
+      for (const cacheUrl of cacheUrls) {
+        try {
+          const cached = await httpGet(cacheUrl);
+          if (cached && cached.items && cached.items.length > 0) {
+            return { success: true, count: cached.items.length, items: cached.items, cached: true };
+          }
+        } catch {}
+      }
       // Fallback to live fetch
       try {
         const url = `https://televisionstats.com/top/${date}`;
