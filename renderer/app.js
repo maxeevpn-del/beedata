@@ -142,6 +142,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadVersion();
   loadDashboard();
 
+  // mobile: tap card to expand/collapse truncated text
+  document.addEventListener('click', (e) => {
+    if (window.innerWidth > 768) return;
+    const td = e.target.closest('td');
+    if (!td) return;
+    const ex = td.style.overflow !== 'visible';
+    td.style.whiteSpace = ex ? 'normal' : 'nowrap';
+    td.style.overflow = ex ? 'visible' : 'hidden';
+    td.style.textOverflow = ex ? 'unset' : 'ellipsis';
+  });
+
   try {
     topicList = await window.electronAPI.getTopics();
     const select = document.getElementById('topicId');
