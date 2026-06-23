@@ -6,3 +6,6 @@ _cos-config.json
 *.xlsx
 history.json
 config.json
+android/app/build/
+android/.gradle/
+android/captures/

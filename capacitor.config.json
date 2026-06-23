@@ -1,0 +1,8 @@
+{
+  "appId": "com.beedata.app",
+  "appName": "蜜蜂数据",
+  "webDir": "renderer",
+  "server": {
+    "androidScheme": "https"
+  }
+}

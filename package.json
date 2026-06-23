@@ -37,6 +37,8 @@
     }
   },
   "dependencies": {
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/share": "^8.0.1",
     "axios": "^1.7.0",
     "cheerio": "^1.0.0",
     "exceljs": "^4.4.0",
@@ -44,6 +46,10 @@
     "socks-proxy-agent": "^8.0.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "cos-nodejs-sdk-v5": "^2.15.4",
     "electron": "^42.4.1",
     "electron-builder": "^26.0.12",
     "nexe": "^5.0.0-beta.4",
