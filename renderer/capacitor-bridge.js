@@ -147,7 +147,7 @@ if (isCapacitor) {
       return results;
     },
 
-    detectProxy: () => Promise.resolve({ found: false, proxy: null, message: 'ç§»åŠ¨ç«¯ä½¿ç”¨ç³»ç»Ÿ VPN å³å¯ï¼Œæ— éœ€æ‰‹åŠ¨é…ç½®ä»£ç†' }),
+    detectProxy: () => Promise.resolve({ found: false, proxy: null, message: 'ç§»åŠ¨ç«¯ä½¿ç”¨ç³»ç»?VPN å³å¯ï¼Œæ— éœ€æ‰‹åŠ¨é…ç½®ä»£ç†' }),
 
     getHistory: () => storageGet('history'),
     getVersion: () => Promise.resolve({ version: '1.0.6' }),
@@ -177,27 +177,26 @@ if (isCapacitor) {
 
 function parseDailyViewHTML(html) {
   const items = [];
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-  const cards = doc.querySelectorAll('[class*="ItemCard_rank_block"]');
-  cards.forEach(card => {
-    if (card.innerHTML.length > 25000) return;
-    const rankEl = card.querySelector('[class*="ItemCard_ranking"]');
-    const rank = parseInt(rankEl?.textContent?.trim()) || 0;
+  const clean = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
+  const blocks = clean.split(/(?=class="[^"]*ItemCard_rank_block[^"]*")/g).filter(b => b.includes('ItemCard_rank_block'));
+  blocks.forEach(block => {
+    if (block.length > 25000) return;
+    const rankMatch = block.match(/ItemCard_ranking[^>]*>([^<]+)</);
+    const rank = rankMatch ? parseInt(rankMatch[1].trim()) : 0;
     if (rank < 1 || rank > 100) return;
-    const titleEl = card.querySelector('[class*="ItemCard_item_title"]');
-    const title = titleEl?.textContent?.trim();
+    const titleMatch = block.match(/ItemCard_item_title[^>]*>([^<]+)</);
+    const title = titleMatch ? titleMatch[1].trim() : '';
     if (!title || title.length > 60) return;
-    const text = card.textContent.replace(/\s+/g, ' ');
-    const volMatch = text.match(/ç¶²è·¯è²é‡\s*([\d,]+)\s*ç­†/);
-    const volume = volMatch ? parseInt(volMatch[1].replace(/,/g, '')) : 0;
-    const posMatch = text.match(/æ­£é¢\s*(\d+)\s*%/);
-    const neuMatch = text.match(/ä¸­ç«‹\s*(\d+)\s*%/);
-    const negMatch = text.match(/è² é¢\s*(\d+)\s*%/);
-    let keywords = '-';
-    const kwMatch = text.match(/ç†±é–€é—œéµå­—\s*(.{1,50})/);
-    if (kwMatch) { let raw = kwMatch[1].trim(); const ti = raw.search(/[0-9]|é¦–é |å£ç¢‘|è²é‡æŽ’è¡Œ|åˆ†æžæœŸé–“|ä»€éº¼æ˜¯/); if (ti > 0) raw = raw.slice(0, ti).trim(); else if (ti === 0) raw = ''; if (raw.length > 0) keywords = raw; }
-    items.push({ rank, title, volume, positive: posMatch ? posMatch[1]+'%' : '-', neutral: neuMatch ? neuMatch[1]+'%' : '-', negative: negMatch ? negMatch[1]+'%' : '-', keywords });
+    const text = block.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    const vMatch = text.match(/¾WÂ·Â•Á¿\s*([\d,]+)\s*¹P/);
+    const volume = vMatch ? parseInt(vMatch[1].replace(/,/g, '')) : 0;
+    const pos = text.match(/ÕýÃæ\s*(\d+)\s*%/);
+    const neu = text.match(/ÖÐÁ¢\s*(\d+)\s*%/);
+    const neg = text.match(/Ø“Ãæ\s*(\d+)\s*%/);
+    let kw = '-';
+    const km = text.match(/ŸáéTêPæI×Ö\s*(.{1,50})/);
+    if (km) { let r = km[1].trim(); const ti = r.search(/[0-9]|Ê×í“|¿Ú±®|Â•Á¿ÅÅÐÐ|·ÖÎöÆÚég|Ê²üNÊÇ/); if (ti > 0) r = r.slice(0, ti).trim(); else if (ti === 0) r = ''; if (r.length > 0) kw = r; }
+    items.push({ rank, title, volume, positive: pos ? pos[1]+'%' : '-', neutral: neu ? neu[1]+'%' : '-', negative: neg ? neg[1]+'%' : '-', keywords: kw });
   });
   return items;
 }
@@ -213,8 +212,9 @@ function parseTVStatsHTML(html) {
     shows.forEach((entry, idx) => {
       const show = entry.show || {};
       const networks = (show.networks || []).map(n => n.name).join(', ');
-      items.push({ rank: idx + 1, title: show.name || '-', network: networks || '-', buzzScore: entry.value != null ? entry.value.toFixed(1) : '-', status: show.in_production ? 'æ’­å‡ºä¸­' : 'å·²å®Œç»“' });
+      items.push({ rank: idx + 1, title: show.name || '-', network: networks || '-', buzzScore: entry.value != null ? entry.value.toFixed(1) : '-', status: show.in_production ? 'æ’­å‡ºä¸? : 'å·²å®Œç»? });
     });
   } catch {}
   return items;
 }
+
