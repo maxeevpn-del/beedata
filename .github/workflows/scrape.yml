@@ -51,50 +51,6 @@ jobs:
           })();
           "
 
-      - name: Scrape DailyView
-        continue-on-error: true
-        run: |
-          node -e "
-          const axios = require('axios'), fs = require('fs');
-          async function fetchDV() {
-            const all=[];
-            for(let p=1;p<=10;p++){
-              const r=await axios.get('https://dailyview.tw/top100/topic/47?range=7&page='+p,{
-                timeout:30000,headers:{'User-Agent':'Mozilla/5.0','Accept-Language':'zh-TW'}});
-              const html=r.data.replace(/<script[\\s\\S]*?<\\/script>/gi,'').replace(/<style[\\s\\S]*?<\\/style>/gi,'');
-              const blocks=html.split(/(?=class=\"[^\"]*ItemCard_rank_block[^\"]*\")/g).filter(b=>b.includes('ItemCard_rank_block'));
-              const items=[];
-              blocks.forEach(block=>{
-                if(block.length>25000)return;
-                const rk=parseInt((block.match(/ItemCard_ranking[^>]*>([^<]+)</)||[])[1])||0;
-                if(rk<1||rk>100)return;
-                const tl=(block.match(/ItemCard_item_title[^>]*>([^<]+)</)||[])[1];
-                if(!tl||tl.length>60)return;
-                const tx=block.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ');
-                const v=(tx.match(/網路聲量\\s*([\\d,]+)\\s*筆/)||[])[1];
-                const vol=v?parseInt(v.replace(/,/g,'')):0;
-                const pos=(tx.match(/正面\\s*(\\d+)\\s*%/)||[])[1];
-                const neu=(tx.match(/中立\\s*(\\d+)\\s*%/)||[])[1];
-                const neg=(tx.match(/負面\\s*(\\d+)\\s*%/)||[])[1];
-                let kw='-'; const km=tx.match(/熱門關鍵字\\s*(.{1,50})/);
-                if(km){let rw=km[1].trim();const ti=rw.search(/[0-9]|首頁|口碑|聲量排行|分析期間|什麼是/);if(ti>0)rw=rw.slice(0,ti).trim();else if(ti===0)rw='';if(rw.length>0)kw=rw;}
-                items.push({rank:rk,title:tl.trim(),volume:vol,positive:pos?pos+'%':'-',neutral:neu?neu+'%':'-',negative:neg?neg+'%':'-',keywords:kw});
-              });
-              if(!items.length)break;
-              all.push(...items);
-              if(p>1)await new Promise(r=>setTimeout(r,500));
-            }
-            return all;
-          }
-          (async()=>{
-            const items=await fetchDV();
-            if(!items.length){process.exit(1)}
-            fs.mkdirSync('dailyview-cache',{recursive:true});
-            fs.writeFileSync('dailyview-cache/latest.json',JSON.stringify({topic:'47',range:'7',date:new Date().toISOString().slice(0,10),items}));
-            console.log('DailyView OK:',items.length);
-          })();
-          "
-
       - name: Upload to COS
         env:
           COS_ID: ${{ secrets.COS_SECRET_ID }}
@@ -102,14 +58,11 @@ jobs:
         run: |
           test -n "$COS_ID" || { echo "COS not configured, skip"; exit 0; }
           node -e 'const COS=require("cos-nodejs-sdk-v5"),fs=require("fs"),c=new COS({SecretId:process.env.COS_ID,SecretKey:process.env.COS_KEY});
-          [["tvstats-cache/latest.json","tvstats-cache/latest.json"],["dailyview-cache/latest.json","dailyview-cache/latest.json"]].forEach(([k,f])=>{
-            if(fs.existsSync(f))c.putObject({Bucket:"beedata-1251427456",Region:"ap-beijing",Key:k,Body:fs.readFileSync(f),ACL:"public-read"},e=>{if(e)console.error(k,e);else console.log("COS:",k)})
-          })'
+          c.putObject({Bucket:"beedata-1251427456",Region:"ap-beijing",Key:"tvstats-cache/latest.json",Body:fs.readFileSync("tvstats-cache/latest.json"),ACL:"public-read"},e=>{if(e)console.error(e);else console.log("COS: tvstats-cache/latest.json")})'
 
       - name: Commit & Push
         run: |
           git config user.name 'github-actions'
           git config user.email 'actions@github.com'
           test -d tvstats-cache && git add tvstats-cache/
-          test -d dailyview-cache && git add dailyview-cache/
-          git diff --staged --quiet || (git commit -m "daily: data cache" && git push)
+          git diff --staged --quiet || (git commit -m "daily: TV Stats cache" && git push)
