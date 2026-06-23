@@ -179,7 +179,6 @@
     onFetchProgress: (cb) => { window._fetchProgressCB = cb; return cb; },
     offFetchProgress: () => { window._fetchProgressCB = null; },
   };
-}
 
 function parseDailyViewHTML(html) {
   const items = [];
@@ -218,7 +217,7 @@ function parseTVStatsHTML(html) {
     shows.forEach((entry, idx) => {
       const show = entry.show || {};
       const networks = (show.networks || []).map(n => n.name).join(', ');
-      items.push({ rank: idx + 1, title: show.name || '-', network: networks || '-', buzzScore: entry.value != null ? entry.value.toFixed(1) : '-', status: show.in_production ? '播出�? : '已完�? });
+      items.push({ rank: idx + 1, title: show.name || '-', network: networks || '-', buzzScore: entry.value != null ? entry.value.toFixed(1) : '-', status: show.in_production ? 'On Air' : 'Ended' });
     });
   } catch {}
   return items;
@@ -226,4 +225,6 @@ function parseTVStatsHTML(html) {
 
   } catch(e) { console.error('[bridge] init failed', e); }
 })();
+
+
 
