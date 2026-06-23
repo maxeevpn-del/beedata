@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
 
-      - run: npm install axios cheerio https-proxy-agent socks-proxy-agent
+      - run: npm install axios cheerio https-proxy-agent socks-proxy-agent cos-nodejs-sdk-v5
 
       - name: Scrape TV Stats
         run: |
@@ -57,7 +57,8 @@ jobs:
               console.log('Try', ds);
               const items = await fetchTVStats(ds);
               if (items && items.length > 0) {
-                fs.writeFileSync('tvstats-cache/latest.json', JSON.stringify({ date: ds, items }));
+                const json = JSON.stringify({ date: ds, items });
+                fs.writeFileSync('tvstats-cache/latest.json', json);
                 console.log('OK:', items.length, 'items');
                 process.exit(0);
               }
@@ -65,6 +66,21 @@ jobs:
             console.log('No data found');
             process.exit(1);
           })();
+          "
+
+      - name: Upload to COS
+        if: ${{ secrets.COS_SECRET_ID != '' }}
+        run: |
+          node -e "
+          const COS = require('cos-nodejs-sdk-v5');
+          const fs = require('fs');
+          const cos = new COS({ SecretId: '${{ secrets.COS_SECRET_ID }}', SecretKey: '${{ secrets.COS_SECRET_KEY }}' });
+          const body = fs.readFileSync('tvstats-cache/latest.json');
+          const data = JSON.parse(body);
+          cos.putObject({ Bucket: 'beedata-1251427456', Region: 'ap-beijing', Key: 'tvstats-cache/latest.json', Body: body, ACL: 'public-read' }, (err) => {
+            if (err) { console.error(err); process.exit(1); }
+            console.log('COS uploaded');
+          });
           "
 
       - name: Commit & Push
